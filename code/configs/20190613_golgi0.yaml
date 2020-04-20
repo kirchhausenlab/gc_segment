@@ -1,0 +1,7 @@
+data_path:  /home/tkadmin/mihir/data/20190613_full/
+coords: [1968, 1168, 356, 344]
+n_superpixels: 6000
+n_jobs: 48
+use_gmm: True
+delta: 1
+lamda: 4
