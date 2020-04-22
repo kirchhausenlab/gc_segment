@@ -2,6 +2,7 @@ from utils import *
 from VolumeAnnotator import *
 import pickle
 import time
+import numpy as np
 
 import threading
 import time
@@ -14,9 +15,11 @@ import logging
 import numpy as np
 import SimpleITK as sitk
 
+from funlib.segment.arrays import replace_values
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 anim_done_ = False
@@ -204,28 +207,40 @@ class SegmentationModule(object):
         align_left('Discovering supervoxels')
         start_time = time.time()
         if self.labels1 is None:
-            # TODO check whether I can
             sitk_img = sitk.GetImageFromArray(image)
             logger.debug(
                 f'sitk image size {sitk_img.GetSize()}')
-            logger.debug(
-                f'sitk image dimensionality {sitk_img.GetDimension()}')
-            logger.debug(
-                f'sitk image channels {sitk_img.GetNumberOfComponentsPerPixel()}')
             logger.debug(
                 f'sitk image dtype {sitk_img.GetPixelIDTypeAsString()}')
 
             # TODO port params into config
             slic = sitk.SLICImageFilter()
             slic.SetSpatialProximityWeight(10)
-            slic.SetSuperGridSize([20, 20, 20])
+            slic.SetSuperGridSize([16, 16, 16])
             slic.SetEnforceConnectivity(True)
             slic.SetNumberOfThreads(64)
             slic.SetMaximumNumberOfIterations(10)
 
             sitk_labels = slic.Execute(sitk_img)
-            # TODO convert dtype to output dtype of skimage
-            self.labels1 = sitk.GetArrayFromImage(sitk_labels)
+            numpy_labels = sitk.GetArrayFromImage(sitk_labels)
+
+            # TODO not sure if type casting is necessary, this is simply
+            # matching the sklearn output dtype
+            self.labels1 = numpy_labels.astype('int64')
+
+            debug_start_time = time.time()
+            old_values = np.unique(self.labels1)
+            # this currently needs a boost install via apt
+            replace_values(
+                in_array=self.labels1,
+                inplace=True,
+                old_values=old_values,
+                new_values=np.arange(len(old_values), dtype=old_values.dtype))
+
+            logger.debug((
+                'Replacing supervoxel ids to be contiguous took '
+                f'{time.time() - debug_start_time} s'
+            ))
 
             logger.info(
                 f'Number of generated supervoxels: {len(np.unique(self.labels1))}'
@@ -380,10 +395,10 @@ class SegmentationModule(object):
         # bg_img[-1,:,:]    = bg_img_anno_last
 
         # Using gaussians - wrong.
-        #fg_inv_energy = place_gaussians(fg_img, sigmax=50, sigmay=50)
-        #bg_inv_energy = place_gaussians(bg_img, sigmax=50, sigmay=50)
-        #fg_inv_prob = np.exp(-fg_inv_energy)
-        #bg_inv_prob = np.exp(-bg_inv_energy)
+        # fg_inv_energy = place_gaussians(fg_img, sigmax=50, sigmay=50)
+        # bg_inv_energy = place_gaussians(bg_img, sigmax=50, sigmay=50)
+        # fg_inv_prob = np.exp(-fg_inv_energy)
+        # bg_inv_prob = np.exp(-bg_inv_energy)
 
         # Using distance transform
         # ====================================================================
@@ -559,7 +574,7 @@ class SegmentationModule(object):
                 'Limits of pairwise terms',
                 pw_costs.min(),
                 pw_costs.max()))
-        #print(hog_pw.min(), hog_pw.max())
+        # print(hog_pw.min(), hog_pw.max())
 
         # ====================================================================
         #   Compute max flow
