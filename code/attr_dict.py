@@ -13,8 +13,8 @@
 # limitations under the License.
 #
 #
-# msahasrabudhe Edits: 
-#   1.  An function make_recursive_attr_dict to recursively 
+# msahasrabudhe Edits:
+#   1.  An function make_recursive_attr_dict to recursively
 #       initialise an AttrDict.
 #   2.  A function to load a .yaml file into an AttrDict.
 ##############################################################################
@@ -26,6 +26,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 import yaml
+
 
 class AttrDict(dict):
 
@@ -75,11 +76,13 @@ class AttrDict(dict):
 """ 
 Custom function to make an attr_dict recursively
 """
+
+
 def make_recursive_attr_dict(my_dict):
     this_attr_dict = AttrDict(my_dict)
     for key in my_dict.keys():
         if isinstance(my_dict[key], dict):
-            setattr(this_attr_dict, key, make_recursive_attr_dict(my_dict[key]))
+            setattr(this_attr_dict, key,
+                    make_recursive_attr_dict(my_dict[key]))
 
     return this_attr_dict
-           
