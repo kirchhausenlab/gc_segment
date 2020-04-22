@@ -213,10 +213,10 @@ class SegmentationModule(object):
             logger.debug(
                 f'sitk image dtype {sitk_img.GetPixelIDTypeAsString()}')
 
-            # TODO port params into config
+            # TODO port relevant params into config
             slic = sitk.SLICImageFilter()
             slic.SetSpatialProximityWeight(10)
-            slic.SetSuperGridSize([16, 16, 16])
+            slic.SetSuperGridSize([self.options.superpixel_size] * 3)
             slic.SetEnforceConnectivity(True)
             slic.SetNumberOfThreads(64)
             slic.SetMaximumNumberOfIterations(10)

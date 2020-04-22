@@ -31,8 +31,8 @@ DEFAULT_HYPERPARAMS = {
 
     # Compactness for SLIC segmentation.
     'compactness': 10,
-    # Number of superpixels for SLIC segmentation.
-    'n_superpixels': 4000,
+    # Initial isotropic superpixel size for slic segmentation.
+    'superpixel_size': 16,
 
 
     # Multiplier for FG and BG histogram for unary terms.
@@ -289,7 +289,7 @@ def get_pairwise_costs(
             xn, yn, zn = px_locations[n,
                                       0], px_locations[n, 1], px_locations[n, 2]
 
-            mult = np.exp(-beta *
+            mult = np.exp(-beta * \
                           np.sum((grey_values[m] - grey_values[n])**2) / (2 * sigma**2))
             dist = np.sqrt((xm - xn) ** 2 + (ym - yn) ** 2 + (zm - zn) ** 2)
             assert dist > 0, 'dist = 0 for m = %d [%d, %d], n = %d [%d, %d]' % (
