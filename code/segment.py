@@ -12,6 +12,7 @@ import argparse
 import maxflow
 import logging
 import numpy as np
+import SimpleITK as sitk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -203,23 +204,40 @@ class SegmentationModule(object):
         align_left('Discovering supervoxels')
         start_time = time.time()
         if self.labels1 is None:
-            # TODO use a proper rgb transformation. Put a breakpoint here to
-            # check out the 3 channels. They should not be all the same
-            rgb = np.concatenate((image[..., None],
-                                  image[..., None],
-                                  image[..., None]), axis=3)
+            # TODO check whether I can
+            sitk_img = sitk.GetImageFromArray(image)
+            logger.debug(
+                f'sitk image size {sitk_img.GetSize()}')
+            logger.debug(
+                f'sitk image dimensionality {sitk_img.GetDimension()}')
+            logger.debug(
+                f'sitk image channels {sitk_img.GetNumberOfComponentsPerPixel()}')
+            logger.debug(
+                f'sitk image dtype {sitk_img.GetPixelIDTypeAsString()}')
 
-            self.labels1 = sksegmentation.slic(
-                rgb,
-                compactness=self.options.compactness,
-                n_segments=self.options.n_superpixels,
-                enforce_connectivity=True,
-                convert2lab=True,
-                multichannel=True)
+            # TODO port params into config
+            slic = sitk.SLICImageFilter()
+            slic.SetSpatialProximityWeight(10)
+            slic.SetSuperGridSize([20, 20, 20])
+            slic.SetEnforceConnectivity(True)
+            slic.SetNumberOfThreads(64)
+            slic.SetMaximumNumberOfIterations(10)
+
+            sitk_labels = slic.Execute(sitk_img)
+            # TODO convert dtype to output dtype of skimage
+            self.labels1 = sitk.GetArrayFromImage(sitk_labels)
+
             logger.info(
                 f'Number of generated supervoxels: {len(np.unique(self.labels1))}'
             )
-            logger.debug(f'Supervoxel labels dtype {self.labels1.dtype}')
+            # self.labels1 = sksegmentation.slic(
+            # rgb,
+            # compactness=self.options.compactness,
+            # n_segments=self.options.n_superpixels,
+            # enforce_connectivity=True,
+            # convert2lab=True,
+            # multichannel=True)
+
         write_done(start_time)
         print(
             'Size of the volume is Z: %d, Y: %d, X: %d' %
