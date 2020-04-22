@@ -10,6 +10,11 @@ import itertools
 import argparse
 
 import maxflow
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 anim_done_ = False
@@ -210,7 +215,7 @@ class SegmentationModule(object):
                 enforce_connectivity=True,
                 convert2lab=True,
                 multichannel=True)
-
+            logger.debug(f'supervoxel labels dtype {self.labels1.dtype}')
         write_done(start_time)
         print(
             'Size of the volume is Z: %d, Y: %d, X: %d' %
