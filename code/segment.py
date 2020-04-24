@@ -11,6 +11,7 @@ import argparse
 
 import maxflow
 import logging
+import numpy as np
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -215,7 +216,10 @@ class SegmentationModule(object):
                 enforce_connectivity=True,
                 convert2lab=True,
                 multichannel=True)
-            logger.debug(f'supervoxel labels dtype {self.labels1.dtype}')
+            logger.info(
+                f'Number of generated supervoxels: {len(np.unique(self.labels1))}'
+            )
+            logger.debug(f'Supervoxel labels dtype {self.labels1.dtype}')
         write_done(start_time)
         print(
             'Size of the volume is Z: %d, Y: %d, X: %d' %
