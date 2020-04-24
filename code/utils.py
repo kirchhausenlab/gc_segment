@@ -23,6 +23,12 @@ from IPython.display import HTML
 import argparse
 from attr_dict import *
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 DEFAULT_HYPERPARAMS = {
     # Z-limits. Whether to crop the image along Z as well. If None,
@@ -331,3 +337,13 @@ def place_gaussians(fg, sigmax=5, sigmay=5):
 
 #        G += place_gaussian(X, Y, x, y, sigmax=sigmax, sigmay=sigmay)
     return G
+
+
+def get_supervoxel_size(n_supervoxels, volume_size):
+    supervoxel_size = int(
+        np.floor((np.prod(volume_size) / n_supervoxels)**(1 / 3)))
+    logger.debug((
+        f'\n{n_supervoxels} requested, '
+        f'leads to supervoxel edge length of {supervoxel_size}'
+    ))
+    return supervoxel_size

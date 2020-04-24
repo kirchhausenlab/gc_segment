@@ -18,6 +18,7 @@ import SimpleITK as sitk
 from funlib.segment.arrays import replace_values
 
 import visualization_utils
+from utils import get_supervoxel_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -209,6 +210,12 @@ class SegmentationModule(object):
         align_left('Discovering supervoxels')
         start_time = time.time()
         if self.labels1 is None:
+
+            supervoxel_size = get_supervoxel_size(
+                self.options.n_superpixels,
+                image.shape
+            )
+
             sitk_img = sitk.GetImageFromArray(image)
             logger.debug(
                 f'sitk image size {sitk_img.GetSize()}')
@@ -218,7 +225,7 @@ class SegmentationModule(object):
             # TODO port relevant params into config
             slic = sitk.SLICImageFilter()
             slic.SetSpatialProximityWeight(25)
-            slic.SetSuperGridSize([self.options.superpixel_size] * 3)
+            slic.SetSuperGridSize([supervoxel_size] * 3)
             slic.SetEnforceConnectivity(True)
             slic.SetNumberOfThreads(64)
             slic.SetMaximumNumberOfIterations(10)
@@ -245,15 +252,8 @@ class SegmentationModule(object):
             ))
 
             logger.info(
-                f'Number of generated supervoxels: {len(np.unique(self.labels1))}'
+                f'\nNumber of generated supervoxels: {len(np.unique(self.labels1))}'
             )
-            # self.labels1 = sksegmentation.slic(
-            # rgb,
-            # compactness=self.options.compactness,
-            # n_segments=self.options.n_superpixels,
-            # enforce_connectivity=True,
-            # convert2lab=True,
-            # multichannel=True)
 
         write_done(start_time)
         print(
