@@ -17,6 +17,8 @@ import SimpleITK as sitk
 
 from funlib.segment.arrays import replace_values
 
+import visualization_utils
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -215,7 +217,7 @@ class SegmentationModule(object):
 
             # TODO port relevant params into config
             slic = sitk.SLICImageFilter()
-            slic.SetSpatialProximityWeight(10)
+            slic.SetSpatialProximityWeight(25)
             slic.SetSuperGridSize([self.options.superpixel_size] * 3)
             slic.SetEnforceConnectivity(True)
             slic.SetNumberOfThreads(64)
