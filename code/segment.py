@@ -317,7 +317,8 @@ class SegmentationModule(object):
         align_left('Compting grey values for supervoxels')
         start_time = time.time()
         if self.grey_v_px is None:
-            self.grey_v_px = get_grey_values(
+            # TODO move supervoxel_indices out of if and save to disk as well
+            self.grey_v_px, self.supervoxel_indices = get_grey_values(
                 image, self.labels1, n_jobs=self.options.n_jobs)
         write_done(start_time)
         # ====================================================================
@@ -330,20 +331,29 @@ class SegmentationModule(object):
                                      range(image.shape[0]),
                                      range(image.shape[2]))
             align_left('Compting x-coordinate of centres of supervoxels')
-            spx_x_coord = get_grey_values(
-                X_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_x_coord, _ = get_grey_values(
+                X_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
 
             start_time = time.time()
             align_left('Compting y-coordinate of centres of supervoxels')
-            spx_y_coord = get_grey_values(
-                Y_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_y_coord, _ = get_grey_values(
+                Y_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
 
             start_time = time.time()
             align_left('Compting z-coordinate of centres of supervoxels')
-            spx_z_coord = get_grey_values(
-                Z_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_z_coord, _ = get_grey_values(
+                Z_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
             self.spx_locations = np.concatenate((spx_x_coord[..., None],
                                                  spx_y_coord[..., None],
@@ -382,7 +392,7 @@ class SegmentationModule(object):
             elif 'Background' in f_path and anno_plane < image.shape[0]:
                 bg_img[anno_plane, :, :] = anno_img
     #        else:
-    #            raise ValueError('Could not understand annotation file %s' %(f_path))
+    # raise ValueError('Could not understand annotation file %s' %(f_path))
         write_done(start_time)
         # ====================================================================
 
@@ -423,13 +433,16 @@ class SegmentationModule(object):
             get_grey_values(
                 fg_inv_prob,
                 self.labels1,
-                n_jobs=self.options.n_jobs))
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)[0])
         bg_inv_prob_spx = np.log(
             1 +
             get_grey_values(
                 bg_inv_prob,
                 self.labels1,
-                n_jobs=self.options.n_jobs))
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)[0])
+
         self.fg_inv_prob_spx = fg_inv_prob_spx
         self.bg_inv_prob_spx = bg_inv_prob_spx
         write_done(start_time)
@@ -479,10 +492,16 @@ class SegmentationModule(object):
         # ====================================================================
         align_left('Computing histogram unaries')
         start_time = time.time()
-        fg_unaries = get_grey_values(fg_pix_unaries, self.labels1,
-                                     n_jobs=self.options.n_jobs)
-        bg_unaries = get_grey_values(bg_pix_unaries, self.labels1,
-                                     n_jobs=self.options.n_jobs)
+        fg_unaries, _ = get_grey_values(
+            fg_pix_unaries,
+            self.labels1,
+            n_jobs=self.options.n_jobs,
+            indices=self.supervoxel_indices)
+        bg_unaries, _ = get_grey_values(
+            bg_pix_unaries,
+            self.labels1,
+            n_jobs=self.options.n_jobs,
+            indices=self.supervoxel_indices)
         write_done(start_time)
 
         self.fg_unaries = fg_unaries
@@ -504,11 +523,15 @@ class SegmentationModule(object):
         # cells_per_block=(1, 1), visualize=True, feature_vector=False,
         # multichannel=False)
 
-        # fd_ex = cv2.resize(fd[:,:,0,0,0], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+        # fd_ex = cv2.resize(fd[:,:,0,0,0], (img.shape[1], img.shape[0]),
+        # interpolation=cv2.INTER_NEAREST)
 
-        # fd_ex = np.concatenate([cv2.resize(fd[:,:,0,0,i], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)[...,None] for i in range(16)], axis=-1)
+        # fd_ex = np.concatenate([cv2.resize(fd[:,:,0,0,i], (img.shape[1],
+        # img.shape[0]), interpolation=cv2.INTER_NEAREST)[...,None] for i in
+        # range(16)], axis=-1)
 
-        # fd_sp = np.concatenate([get_grey_values(fd_ex[:,:,i], self.labels1)[...,None] for i in range(16)], axis=-1)
+        # fd_sp = np.concatenate([get_grey_values(fd_ex[:,:,i],
+        # self.labels1)[...,None] for i in range(16)], axis=-1)
 
         # _, hog_pw = get_pairwise_costs(fd_sp, self.spx_locations, self.adj_mat, 1, img.shape[:2], sigma=10)
         # hog_pw = np.array(hog_pw)
@@ -660,7 +683,9 @@ class SegmentationModule(object):
                         os.makedirs(dir_)
 
                 for s in range(image.shape[0]):
-                    #                oimg                = imageio.imread(os.path.join(self.data_path, orig_file_list[s+z_limits[0]]))
+                    # oimg                =
+                    # imageio.imread(os.path.join(self.data_path,
+                    # orig_file_list[s+z_limits[0]]))
                     mask0 = label_img[s, :, :]
 
                     mask_img[:, :] = mask0 * 255

@@ -216,6 +216,11 @@ def make_adjacency_matrix(L, n_jobs=32):
     return adj_mat
 
 
+def get_grey_value_from_indices(I, L, c, where):
+    px = I[where].mean()
+    return px
+
+
 def get_grey_value_(I, L, c):
     """
     Helper function that computes the grey value for superpixel c.
@@ -225,21 +230,32 @@ def get_grey_value_(I, L, c):
     px = I[where].mean()
 #    M                           = (L == c)
 #    px                          = (I * M).sum() / (M.sum() * 1.0)
-    return px
+    return px, where
 
 
-def get_grey_values(I, L, n_jobs=32):
+def get_grey_values(I, L, n_jobs=32, indices=None):
     # Get average grey values for every superpixel, and call it the grey value
     # for the superpixel
     n_superpixels = np.unique(L).size
     I_ = I.astype(np.float32).ravel()
     L_ = L.ravel()
-    # Parallelise over multiple CPUs.
-    with parallel_backend('threading', n_jobs=n_jobs):
-        grey_values = Parallel()(delayed(get_grey_value_)(I_, L_, c)
-                                 for c in range(n_superpixels))
 
-    return np.array(grey_values)
+    if indices is None:
+        # Parallelise over multiple CPUs.
+        with parallel_backend('threading', n_jobs=n_jobs):
+            results = Parallel()(delayed(get_grey_value_)(I_, L_, c)
+                                 for c in range(n_superpixels))
+        grey_values, wheres = zip(*results)
+        indices = wheres
+
+    else:
+        # Parallelise over multiple CPUs.
+        with parallel_backend('threading', n_jobs=n_jobs):
+            grey_values = Parallel()(
+                delayed(get_grey_value_from_indices)(
+                    I_, L_, c, indices[c]) for c in range(n_superpixels))
+
+    return np.array(grey_values), indices
 
 
 def compute_edge_contr(m, grey_values, N):
