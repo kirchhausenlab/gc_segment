@@ -2,7 +2,7 @@ data_path:  /scratch/ben/20191021/03/
 coords: [2320, 845, 398, 240]
 z_limits: [126, 560]
 n_superpixels: 12000
-n_jobs: 48
+n_jobs: 16
 use_gmm: False
 n_gmm_components: 2
 delta: 1

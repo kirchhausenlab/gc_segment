@@ -201,6 +201,7 @@ class SegmentationModule(object):
             tif_stack.append(img[None, ...])
         image = np.concatenate(tif_stack, axis=0)
 
+        logger.info(f'image shape {image.shape}')
         write_okay()
         # ====================================================================
 
