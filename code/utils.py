@@ -37,8 +37,8 @@ DEFAULT_HYPERPARAMS = {
 
     # Compactness for SLIC segmentation.
     'compactness': 10,
-    # Initial isotropic superpixel size for slic segmentation.
-    'superpixel_size': 16,
+    # Number of superpixels for SLIC segmentation
+    'n_superpixels': 4000,
 
 
     # Multiplier for FG and BG histogram for unary terms.
