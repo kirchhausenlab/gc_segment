@@ -216,7 +216,7 @@ def make_adjacency_matrix(L, n_jobs=32):
     return adj_mat
 
 
-def get_grey_value_from_indices(I, L, c, where):
+def get_grey_value_from_indices(I, c, where):
     px = I[where].mean()
     return px
 
@@ -233,7 +233,7 @@ def get_grey_value_(I, L, c):
     return px, where
 
 
-def get_grey_values(I, L, n_jobs=32, indices=None):
+def get_grey_values(I, L, n_jobs=64, indices=None):
     # Get average grey values for every superpixel, and call it the grey value
     # for the superpixel
     n_superpixels = np.unique(L).size
@@ -249,11 +249,8 @@ def get_grey_values(I, L, n_jobs=32, indices=None):
         indices = wheres
 
     else:
-        # Parallelise over multiple CPUs.
-        with parallel_backend('threading', n_jobs=n_jobs):
-            grey_values = Parallel()(
-                delayed(get_grey_value_from_indices)(
-                    I_, L_, c, indices[c]) for c in range(n_superpixels))
+        grey_values = [get_grey_value_from_indices(
+            I_, c, indices[c]) for c in range(n_superpixels)]
 
     return np.array(grey_values), indices
 

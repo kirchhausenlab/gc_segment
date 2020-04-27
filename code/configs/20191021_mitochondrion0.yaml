@@ -3,7 +3,7 @@ coords: [2320, 845, 398, 240]
 z_limits: [126, 560]
 #n_superpixels: 12000
 superpixel_size: 16
-n_jobs: 16
+n_jobs: 64
 use_gmm: False
 n_gmm_components: 2
 delta: 1
