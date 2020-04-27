@@ -101,6 +101,7 @@ class SegmentationModule(object):
         #   Variables of this class to be saved.
         self.save_vars = [
             'labels1',
+            'supervoxel_indices',
             'adj_mat',
             'spx_locations',
             'grey_v_px',
@@ -317,7 +318,6 @@ class SegmentationModule(object):
         align_left('Compting grey values for supervoxels')
         start_time = time.time()
         if self.grey_v_px is None:
-            # TODO move supervoxel_indices out of if and save to disk as well
             self.grey_v_px, self.supervoxel_indices = get_grey_values(
                 image, self.labels1, n_jobs=self.options.n_jobs)
         write_done(start_time)
