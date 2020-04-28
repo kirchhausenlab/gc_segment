@@ -226,10 +226,10 @@ class SegmentationModule(object):
 
             # TODO port relevant params into config
             slic = sitk.SLICImageFilter()
-            slic.SetSpatialProximityWeight(25)
+            slic.SetSpatialProximityWeight(self.options.compactness)
             slic.SetSuperGridSize([supervoxel_size] * 3)
             slic.SetEnforceConnectivity(True)
-            slic.SetNumberOfThreads(64)
+            slic.SetNumberOfThreads(self.options.n_jobs)
             slic.SetMaximumNumberOfIterations(10)
 
             sitk_labels = slic.Execute(sitk_img)

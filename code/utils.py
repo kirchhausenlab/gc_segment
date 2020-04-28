@@ -35,8 +35,9 @@ DEFAULT_HYPERPARAMS = {
     #    the entire stack is used.
     'z_limits': False,
 
-    # Compactness for SLIC segmentation.
-    'compactness': 10,
+    # Compactness for SLIC segmentation. Higher value leads to more compact
+    # supervoxels
+    'compactness': 25,
     # Number of superpixels for SLIC segmentation
     'n_superpixels': 4000,
 
@@ -308,7 +309,7 @@ def get_pairwise_costs(
             xn, yn, zn = px_locations[n,
                                       0], px_locations[n, 1], px_locations[n, 2]
 
-            mult = np.exp(-beta * \
+            mult = np.exp(-beta *
                           np.sum((grey_values[m] - grey_values[n])**2) / (2 * sigma**2))
             dist = np.sqrt((xm - xn) ** 2 + (ym - yn) ** 2 + (zm - zn) ** 2)
             assert dist > 0, 'dist = 0 for m = %d [%d, %d], n = %d [%d, %d]' % (
