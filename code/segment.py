@@ -131,7 +131,7 @@ class SegmentationModule(object):
         save_dict = self.make_save_dict()
         try:
             with open(self.save_vars_path, 'wb') as fp:
-                pickle.dump(save_dict, fp)
+                pickle.dump(save_dict, fp, protocol=4)
         except Exception as E:
             write_fail()
             print('Could not save variables. Got error {}'.format(E))
