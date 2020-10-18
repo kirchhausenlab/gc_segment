@@ -10,6 +10,10 @@ import time
 import argparse
 from utils import *
 
+
+IMAGE_RECTANGLE = [0.05, 0.20, 0.55, 0.75]
+
+
 FOREGROUND = 'Object'
 BACKGROUND = 'Background'
 ERASE = 'Erase'
@@ -301,19 +305,36 @@ class VolumeAnnotator(object):
 
     # Update current figure.
 
-    def _update_figure(self):
+    def _update_figure(self, axis_switch=False):
         """
         Redraws the figure for the current value of z_.
+        axis_switch: whether viewing axis has been switched to make this call. 
         """
         if self.view_axis_ == X:
-            self.image_handle_.set_data(self.disp_stack_[:, :, self.x_, :])
+            if axis_switch:
+                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[:, :, self.x_, :],
+                                                       cmap=self.im_cmap_)
+            else:
+                self.image_handle_.set_data(self.disp_stack_[:, :, self.x_, :])
         elif self.view_axis_ == Y:
-            self.image_handle_.set_data(self.disp_stack_[:, self.y_, :, :])
+            if axis_switch:
+                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[:, self.y_, :, :],
+                                                       cmap=self.im_cmap_)
+            else:
+                self.image_handle_.set_data(self.disp_stack_[:, self.y_, :, :])
         elif self.view_axis_ == Z:
-            self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
+            if axis_switch:
+                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
+                                                       cmap=self.im_cmap_)
+            else:
+                self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
 
-        self.figure_.canvas.draw_idle()
+#        self.ax_image_.axis('equal')
         self._set_axis_labels()
+        self.figure_.canvas.draw_idle()
         return
 
     def _update_annotation_visual(self):
@@ -527,7 +548,8 @@ class VolumeAnnotator(object):
 
         # Else, switch the viewing axis and update the figure. 
         self.view_axis_ = label
-        self._update_figure()
+        # axis_switch is set to True here because we must readjust for axes. 
+        self._update_figure(axis_switch=True)
         return 
 
     def _handle_scroll_event(self,
@@ -536,6 +558,24 @@ class VolumeAnnotator(object):
         Move along the viewing axis, up and down depending on whether 
         the wheel is scrolled up or down. 
         """
+
+        # First, make sure the figure is initialised. 
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+
+        # If the scroll happens on the brush size slider
+        if event.inaxes == self.ax_brush_size_:
+            if event.button == 'up':
+                self.brush_size_ = bound_low(self.brush_size_ - 2, 1)
+            elif event.button == 'down':
+                self.brush_size_ = bound_high(self.brush_size_ + 2, self.max_brush_size)
+            else:
+                return 
+
+            self.brush_size_slider_.set_val(self.brush_size_)
+            return
+
+        # Else scroll along planes. 
         if self.view_axis_ == X:
             if event.button == 'up':
                 if self.x_ > 0:
@@ -940,7 +980,7 @@ class VolumeAnnotator(object):
         self.axes_.set_facecolor(self.face_colour_)
 
         # Create axes for image.
-        self.ax_image_ = plt.axes([0.05, 0.17, 0.55, 0.8])            # Was 0.05, 0.15, 0.55, 0.8
+        self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
         # Initialise with the current slice.
         self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
                                                    cmap=self.im_cmap_)
@@ -951,7 +991,7 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for X-slider
 
-        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.55, 0.025],
+        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.50, 0.025],
                                      facecolor=self.ax_colour_)
         # Add X-slider.
         self.x_slider_ = Slider(self.ax_x_slider_, 'X', 1,
@@ -966,7 +1006,7 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for Y-slider
 
-        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.55, 0.025],
+        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.50, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.y_slider_ = Slider(self.ax_y_slider_, 'Y', 1,
@@ -981,7 +1021,7 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for Z-slider
 
-        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.55, 0.025],
+        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.50, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.z_slider_ = Slider(self.ax_z_slider_, 'Z', 1,
@@ -993,10 +1033,11 @@ class VolumeAnnotator(object):
 
         # ================================
         #   Create slider for brush size.
-        self.ax_brush_size_ = plt.axes([0.65, 0.9, 0.3, 0.025],
+        self.ax_brush_size_ = plt.axes([0.68, 0.9, 0.27, 0.025],
                                        facecolor=self.ax_colour_)
         # Add slider.
-        self.brush_size_slider_ = Slider(self.ax_brush_size_, 'Brush size', 1, 41,
+        self.max_brush_size = 41
+        self.brush_size_slider_ = Slider(self.ax_brush_size_, 'Brush size', 1, self.max_brush_size,
                                          valinit=1, valstep=2)
         # Add the brush size handler function.
         self.brush_size_slider_.on_changed(self._handle_brush_size_slider)
