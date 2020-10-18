@@ -30,16 +30,17 @@ ANNO_KEYPRESS_DICT = {
 
 AXIS_CHOICES = [X, Y, Z]
 AXIS_KEYPRESS_DICT = {
-    '2':    [Z, 2],
-    '1':    [Y, 1],
-    '0':    [X, 0],
+    '3':    [Z, 2],
+    '2':    [Y, 1],
+    '1':    [X, 0],
 }
 PLANES_KEYPRESS_DICT = {
     'z':   1,
     'm': -1,
 }
 RECOGNISED_KEYBOARD_SHORTCUTS = list(ANNO_KEYPRESS_DICT.keys()) + \
-    list(PLANES_KEYPRESS_DICT.keys())  # + <other keyboard shorcuts>
+    list(PLANES_KEYPRESS_DICT.keys())  + \
+    list(AXIS_KEYPRESS_DICT)     # + <other keyboard shorcuts>
 
 FOREGROUND_NAMES = [FOREGROUND, 'Foreground']
 ANNO_DIR = 'annotation/'
@@ -312,6 +313,7 @@ class VolumeAnnotator(object):
             self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
 
         self.figure_.canvas.draw_idle()
+        self._set_axis_labels()
         return
 
     def _update_annotation_visual(self):
@@ -938,7 +940,7 @@ class VolumeAnnotator(object):
         self.axes_.set_facecolor(self.face_colour_)
 
         # Create axes for image.
-        self.ax_image_ = plt.axes([0.05, 0.15, 0.55, 0.8])            # Was this. 
+        self.ax_image_ = plt.axes([0.05, 0.17, 0.55, 0.8])            # Was 0.05, 0.15, 0.55, 0.8
         # Initialise with the current slice.
         self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
                                                    cmap=self.im_cmap_)
@@ -979,7 +981,7 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for Z-slider
 
-        self.ax_z_slider_ = plt.axes([0.05, 0.11, 0.55, 0.025],
+        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.55, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.z_slider_ = Slider(self.ax_z_slider_, 'Z', 1,
@@ -1017,7 +1019,7 @@ class VolumeAnnotator(object):
                                            facecolor=self.ax_colour_)
         # Add radio buttons
         self.axis_mode_radio_ = RadioButtons(self.ax_axis_mode_ratio_,
-                                            AXIS_CHOICES, active=0)
+                                            AXIS_CHOICES, active=2)
         # Add handler for radio buttons.
         self.axis_mode_radio_.on_clicked(self._handle_axis_mode_radio) # TODO
         # ================================
