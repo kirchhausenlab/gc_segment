@@ -14,16 +14,29 @@ FOREGROUND = 'Object'
 BACKGROUND = 'Background'
 ERASE = 'Erase'
 CLICK = 'Click'
+
+
+# Axes. 
+X, Y, Z = 'X', 'Y', 'Z'
+
 ANNO_CHOICES = [FOREGROUND, BACKGROUND, ERASE, CLICK]
 ANNO_KEYPRESS_DICT = {
-    'q':   [FOREGROUND, 0],
-    'w':   [BACKGROUND, 1],
-    'e':   [ERASE, 2],
-    'r':   [CLICK, 3],
+    'q':    [FOREGROUND, 0],
+    'w':    [BACKGROUND, 1],
+    'e':    [ERASE, 2],
+    'r':    [CLICK, 3],
+}
+
+
+AXIS_CHOICES = [X, Y, Z]
+AXIS_KEYPRESS_DICT = {
+    '2':    [Z, 2],
+    '1':    [Y, 1],
+    '0':    [X, 0],
 }
 PLANES_KEYPRESS_DICT = {
     'z':   1,
-    'x': -1,
+    'm': -1,
 }
 RECOGNISED_KEYBOARD_SHORTCUTS = list(ANNO_KEYPRESS_DICT.keys()) + \
     list(PLANES_KEYPRESS_DICT.keys())  # + <other keyboard shorcuts>
@@ -228,7 +241,11 @@ class VolumeAnnotator(object):
         self.fg_channel = 2         # Blue
         self.bg_channel = 0         # Red
 
-        # Currently shown slice on the figure.
+        # View axis is Z by default. 
+        self.view_axis_     = Z
+        # Currently shown slice on the figure. Initialise this to zero for all axes. 
+        self.x_ = 0
+        self.y_ = 0
         self.z_ = 0
 
         # Currently chosen annotation mode. It is foreground by default.
@@ -287,7 +304,13 @@ class VolumeAnnotator(object):
         """
         Redraws the figure for the current value of z_.
         """
-        self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
+        if self.view_axis_ == X:
+            self.image_handle_.set_data(self.disp_stack_[:, :, self.x_, :])
+        elif self.view_axis_ == Y:
+            self.image_handle_.set_data(self.disp_stack_[:, self.y_, :, :])
+        elif self.view_axis_ == Z:
+            self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
+
         self.figure_.canvas.draw_idle()
         return
 
@@ -380,28 +403,85 @@ class VolumeAnnotator(object):
         row_s_ = max([loc_y_ - bs2_ + 1, 0])
         row_e_ = min([loc_y_ + bs2_, self.stack_height])
 
-        # Record annotation.
-        if self.ann_mode_ == FOREGROUND:
-            self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 1
-            self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
-            self.disp_stack_[self.z_, row_s_:row_e_,
-                             col_s_:col_e_, self.fg_channel] = 255
-            self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.bg_channel] = \
-                self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
-        elif self.ann_mode_ == BACKGROUND:
-            self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 1
-            self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
-            self.disp_stack_[self.z_, row_s_:row_e_,
-                             col_s_:col_e_, self.bg_channel] = 255
-            self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.fg_channel] = \
-                self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
-        elif self.ann_mode_ == ERASE:
-            self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
-            self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
-            self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.bg_channel] = \
-                self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
-            self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.fg_channel] = \
-                self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
+        # Record annotation. This is dependent on what is the current viewing axis. 
+
+        # If viewing axis is X, we annotate in the Y-Z plane. 
+        if self.view_axis_ == X:
+            if self.ann_mode_ == FOREGROUND:
+                self.fg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 1
+                self.bg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 0
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.fg_channel] = 255
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.bg_channel] = \
+                    self.stack[row_s_:row_e_, col_s_:col_e_, self.x_]
+            elif self.ann_mode_ == BACKGROUND:
+                self.bg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 1
+                self.fg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 0
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.bg_channel] = 255
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.fg_channel] = \
+                    self.stack[row_s_:row_e_, col_s_:col_e_, self.x_]
+            elif self.ann_mode_ == ERASE:
+                self.bg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 0
+                self.fg_annotation_[row_s_:row_e_, col_s_:col_e_, self.x_] = 0
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.bg_channel] = \
+                    self.stack[row_s_:row_e_, col_s_:col_e_, self.x_]
+                self.disp_stack_[row_s_:row_e_, col_s_:col_e_, 
+                                 self.x_, self.fg_channel] = \
+                    self.stack[row_s_:row_e_, col_s_:col_e_, self.x_]
+
+        # If viewing axis is Y, we annotate in the X-Z plane. 
+        elif self.view_axis_ == Y:
+            if self.ann_mode_ == FOREGROUND:
+                self.fg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 1
+                self.bg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 0
+                self.disp_stack_[row_s_:row_e_, self.y_,
+                                 col_s_:col_e_, self.fg_channel] = 255
+                self.disp_stack_[row_s_:row_e_, self.y_, 
+                                 col_s_:col_e_, self.bg_channel] = \
+                    self.stack[row_s_:row_e_, self.y_, col_s_:col_e_]
+            elif self.ann_mode_ == BACKGROUND:
+                self.bg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 1
+                self.fg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 0
+                self.disp_stack_[row_s_:row_e_, self.y_,
+                                 col_s_:col_e_, self.bg_channel] = 255
+                self.disp_stack_[row_s_:row_e_, self.y_, col_s_:col_e_, self.fg_channel] = \
+                    self.stack[row_s_:row_e_, self.y_, col_s_:col_e_]
+            elif self.ann_mode_ == ERASE:
+                self.bg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 0
+                self.fg_annotation_[row_s_:row_e_, self.y_, col_s_:col_e_] = 0
+                self.disp_stack_[row_s_:row_e_, self.y_, col_s_:col_e_, self.bg_channel] = \
+                    self.stack[row_s_:row_e_, self.y_, col_s_:col_e_]
+                self.disp_stack_[row_s_:row_e_, self.y_, col_s_:col_e_, self.fg_channel] = \
+                    self.stack[row_s_:row_e_, self.y_, col_s_:col_e_]
+
+
+        # If viewing axis is Z, we annotate in the X-Y plane. 
+        elif self.view_axis_ == Z:
+            if self.ann_mode_ == FOREGROUND:
+                self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 1
+                self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
+                self.disp_stack_[self.z_, row_s_:row_e_,
+                                 col_s_:col_e_, self.fg_channel] = 255
+                self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.bg_channel] = \
+                    self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
+            elif self.ann_mode_ == BACKGROUND:
+                self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 1
+                self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
+                self.disp_stack_[self.z_, row_s_:row_e_,
+                                 col_s_:col_e_, self.bg_channel] = 255
+                self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.fg_channel] = \
+                    self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
+            elif self.ann_mode_ == ERASE:
+                self.bg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
+                self.fg_annotation_[self.z_, row_s_:row_e_, col_s_:col_e_] = 0
+                self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.bg_channel] = \
+                    self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
+                self.disp_stack_[self.z_, row_s_:row_e_, col_s_:col_e_, self.fg_channel] = \
+                    self.stack[self.z_, row_s_:row_e_, col_s_:col_e_]
 
         # Update display.
         self._update_figure()
@@ -430,24 +510,74 @@ class VolumeAnnotator(object):
 
         return
 
+    def _handle_axis_mode_radio(self, 
+                                label):
+        """
+        Handle choice of viewing axis. 
+        """
+
+        # First make sure the figure is initialised. 
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # If the chosen mode is the same as the current mode, there is nothing to do. 
+        if self.view_axis_ == label:
+            return 
+
+        # Else, switch the viewing axis and update the figure. 
+        self.view_axis_ = label
+        self._update_figure()
+        return 
+
     def _handle_scroll_event(self,
                              event):
         """
-        Move along Z, up and down depending on whether 
+        Move along the viewing axis, up and down depending on whether 
         the wheel is scrolled up or down. 
         """
-        if event.button == 'up':
-            if self.z_ > 0:
-                self.z_ -= 1
-        elif event.button == 'down':
-            if self.z_ < self.z_limits[1] - self.z_limits[0] - 1:
-                self.z_ += 1
-        else:
-            return
+        if self.view_axis_ == X:
+            if event.button == 'up':
+                if self.x_ > 0:
+                    self.x_ -= 1
+            elif event.button == 'down':
+                if self.x_ < self.W - 1:
+                    self.x_ += 1
+            else:
+                return
 
-        # Update the z slider as well. A '+ 1' is needed because on the slider, the
-        #   slide numbers start from 0.
-        self.z_slider_.set_val(self.z_ + 1)
+            # Update the x slider as well. A '+ 1' is needed because on the slider, the
+            #   slide numbers start from 0.
+            self.x_slider_.set_val(self.x_ + 1)
+
+
+        if self.view_axis_ == Y:
+            if event.button == 'up':
+                if self.y_ > 0:
+                    self.y_ -= 1
+            elif event.button == 'down':
+                if self.y_ < self.H - 1: 
+                    self.y_ += 1
+            else:
+                return
+
+            # Update the y slider as well. A '+ 1' is needed because on the slider, the
+            #   slide numbers start from 0.
+            self.y_slider_.set_val(self.y_ + 1)    
+
+
+        if self.view_axis_ == Z:
+            if event.button == 'up':
+                if self.z_ > 0:
+                    self.z_ -= 1
+            elif event.button == 'down':
+                if self.z_ < self.z_limits[1] - self.z_limits[0] - 1:
+                    self.z_ += 1
+            else:
+                return
+
+            # Update the z slider as well. A '+ 1' is needed because on the slider, the
+            #   slide numbers start from 0.
+            self.z_slider_.set_val(self.z_ + 1)
+
         # Update figure to reflect the new image.
         self._update_figure()
         return
@@ -472,6 +602,8 @@ class VolumeAnnotator(object):
             return self._handle_anno_keyboard_shorcuts(event.key)
         if event.key in PLANES_KEYPRESS_DICT:
             return self._handle_planes_keyboard_shortcuts(event.key)
+        if event.key in AXIS_KEYPRESS_DICT:
+            return self._handle_axis_keyboard_shortcuts(event.key)
 
         # Can add other functions here.
         return
@@ -491,6 +623,24 @@ class VolumeAnnotator(object):
 
         return
 
+    def _handle_axis_keyboard_shortcuts(self, 
+                                        key):
+        """
+        Handle keyboard shortcuts for viewing axis modes. 
+        """
+
+        # First, make sure the figure is initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        label, index = AXIS_KEYPRESS_DICT[key]
+        # Set the viewing axis. 
+        self.view_axis_ = label
+        self.axis_mode_radio_.set_active(index)
+        # The figure needs to be updated too. 
+        self._update_figure()
+        return 
+
+
     def _handle_planes_keyboard_shortcuts(self,
                                           key):
         """
@@ -507,7 +657,7 @@ class VolumeAnnotator(object):
                 if z__ >= 0 and self.annotated_planes_[z__]:
                     self.z_ = z__
 
-        elif key == 'x':
+        elif key == 'm':
             if self.z_ < self.n_slices - 1:
                 z__ = self.z_ + 1
                 while z__ < self.n_slices and not self.annotated_planes_[z__]:
@@ -521,6 +671,47 @@ class VolumeAnnotator(object):
         # Update figure to reflect the new image.
         self._update_figure()
 
+        return
+
+
+    # Handle x slider.
+
+    def _handle_x_slider(self,
+                         x_val):
+        """
+        Function to handle the X-slider. 
+        Updates the image shown in the image panel according to the value of x. 
+        Function name starts with an underscore in order to be invisible to the outside world.
+        """
+
+        # First, make sure the figure has been initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # Update the index of the currently shown slice.
+        # Takes '- 1' because slices are numbered starting from 1 in the GUI.
+        self.x_ = int(x_val) - 1
+        # Show new image.
+        self._update_figure()
+        return
+
+    # Handle y slider.
+
+    def _handle_y_slider(self,
+                         y_val):
+        """
+        Function to handle the Y-slider. 
+        Updates the image shown in the image panel according to the value of y. 
+        Function name starts with an underscore in order to be invisible to the outside world.
+        """
+
+        # First, make sure the figure has been initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # Update the index of the currently shown slice.
+        # Takes '- 1' because slices are numbered starting from 1 in the GUI.
+        self.y_ = int(y_val) - 1
+        # Show new image.
+        self._update_figure()
         return
 
     # Handle z slider.
@@ -563,17 +754,37 @@ class VolumeAnnotator(object):
                                    event):
         """
         Reset any annotations that have been made for the current slide.
+        This also takes into account what the current viewing axis is. 
         """
 
         # First, make sure the figure has been initialised.
         assert self.initialised_, 'Figure has not been initialised yet!'
 
-        # Reset annotations.
-        self.fg_annotation_[self.z_] = 0
-        self.bg_annotation_[self.z_] = 0
-        # Copy data from original slice into disp_slice. Need only reset the G and B channels.
-        self.disp_stack_[self.z_, :, :, self.fg_channel] = self.stack[self.z_]
-        self.disp_stack_[self.z_, :, :, self.bg_channel] = self.stack[self.z_]
+        if self.view_axis_ == X:
+            # Reset annotations.
+            self.fg_annotation_[:, :, self.x_] = 0
+            self.bg_annotation_[:, :, self.x_] = 0
+            # Copy data from original slice into disp_slice. Need only reset the G and B channels.
+            self.disp_stack_[:, :, self.x_, self.fg_channel] = self.stack[:, :, self.x_]
+            self.disp_stack_[:, :, self.x_, self.bg_channel] = self.stack[:, :, self.x_]
+
+        if self.view_axis_ == Y:
+            # Reset annotations.
+            self.fg_annotation_[:, self.y_, :] = 0
+            self.bg_annotation_[:, self.y_, :] = 0
+            # Copy data from original slice into disp_slice. Need only reset the G and B channels.
+            self.disp_stack_[:, self.y_, :, self.fg_channel] = self.stack[:, self.y_, :]
+            self.disp_stack_[:, self.y_, :, self.bg_channel] = self.stack[:, self.y_, :]
+
+        if self.view_axis_ == Z:
+            # Reset annotations.
+            self.fg_annotation_[self.z_, :, :] = 0
+            self.bg_annotation_[self.z_, :, :] = 0
+            # Copy data from original slice into disp_slice. Need only reset the G and B channels.
+            self.disp_stack_[self.z_, :, :, self.fg_channel] = self.stack[self.z_, :, :]
+            self.disp_stack_[self.z_, :, :, self.bg_channel] = self.stack[self.z_, :, :]
+
+
         # Redraw current figure.
         self._update_figure()
         return
@@ -688,6 +899,22 @@ class VolumeAnnotator(object):
         self._update_figure()
         return
 
+    def _set_axis_labels(self):
+        """
+        Set axis names for the figure according to the viewing axis. 
+        """
+        if self.view_axis_ == X:
+            self.ax_image_.set_xlabel(Y)
+            self.ax_image_.set_ylabel(Z)
+
+        elif self.view_axis_ == Y:
+            self.ax_image_.set_xlabel(X)
+            self.ax_image_.set_ylabel(Z)
+
+        elif self.view_axis_ == Z:
+            self.ax_image_.set_xlabel(X)
+            self.ax_image_.set_ylabel(Y)
+
     # Initialise pyplot figure and run the GUI.
 
     def __call__(self):
@@ -711,18 +938,48 @@ class VolumeAnnotator(object):
         self.axes_.set_facecolor(self.face_colour_)
 
         # Create axes for image.
-        self.ax_image_ = plt.axes([0.05, 0.15, 0.55, 0.8])
+        self.ax_image_ = plt.axes([0.05, 0.15, 0.55, 0.8])            # Was this. 
         # Initialise with the current slice.
         self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
                                                    cmap=self.im_cmap_)
-        # Set dimension names.
-        self.ax_image_.set_xlabel('X')
-        self.ax_image_.set_ylabel('Y')
+
+        # Set dimension names. This should be done according to the viewing axis. 
+        self._set_axis_labels()
+
+        # ================================
+        #   Create axes for X-slider
+
+        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.55, 0.025],
+                                     facecolor=self.ax_colour_)
+        # Add X-slider.
+        self.x_slider_ = Slider(self.ax_x_slider_, 'X', 1,
+                                self.W, 
+                                valinit=self.x_+1, valstep=1)
+        # Add the x-slide handler function to x_slider_
+        self.x_slider_.on_changed(self._handle_x_slider)
+        # ================================
+
+
+
+        # ================================
+        #   Create axes for Y-slider
+
+        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.55, 0.025],
+                                     facecolor=self.ax_colour_)
+        # Add Z-slider.
+        self.y_slider_ = Slider(self.ax_y_slider_, 'Y', 1,
+                                self.H, 
+                                valinit=self.y_+1, valstep=1)
+        # Add the y-slide handler function to y_slider_
+        self.y_slider_.on_changed(self._handle_y_slider)
+        # ================================
+
+
 
         # ================================
         #   Create axes for Z-slider
 
-        self.ax_z_slider_ = plt.axes([0.05, 0.05, 0.55, 0.025],
+        self.ax_z_slider_ = plt.axes([0.05, 0.11, 0.55, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.z_slider_ = Slider(self.ax_z_slider_, 'Z', 1,
@@ -753,6 +1010,19 @@ class VolumeAnnotator(object):
         # Add handler for radio buttons.
         self.ann_mode_radio_.on_clicked(self._handle_ann_mode_radio)
         # ================================
+
+        # ================================
+        #   Add radio buttons for viewing axis. 
+        self.ax_axis_mode_ratio_ = plt.axes([0.85, 0.7, 0.1, 0.1],
+                                           facecolor=self.ax_colour_)
+        # Add radio buttons
+        self.axis_mode_radio_ = RadioButtons(self.ax_axis_mode_ratio_,
+                                            AXIS_CHOICES, active=0)
+        # Add handler for radio buttons.
+        self.axis_mode_radio_.on_clicked(self._handle_axis_mode_radio) # TODO
+        # ================================
+
+ 
 
         # ================================
         #   Add buttons.
@@ -808,6 +1078,22 @@ class VolumeAnnotator(object):
 
     # ========================================================================================
     #   Wrappers for "private" functions. SHOULD BE REMOVED IN THE FINAL VERSION.
+    def handle_x_slider(self,
+                        *args,
+                        **kwargs):
+        """
+        Wrapper for _handle_x_slider which can be removed later!
+        """
+        return self._handle_x_slider(*args, **kwargs)
+
+    def handle_y_slider(self,
+                        *args,
+                        **kwargs):
+        """
+        Wrapper for _handle_y_slider which can be removed later!
+        """
+        return self._handle_y_slider(*args, **kwargs)
+
     def handle_z_slider(self,
                         *args,
                         **kwargs):
@@ -823,6 +1109,9 @@ if __name__ == '__main__':
     for key_ in ANNO_KEYPRESS_DICT:
         assert ANNO_KEYPRESS_DICT[key_][0] in ANNO_CHOICES, '{} not found in ANNO_CHOICES. All keyboard shortcuts \
 for annotations must have associated radio buttons!'.format(ANNO_KEYPRESS_DICT[key_][0])
+    for key_ in AXIS_KEYPRESS_DICT:
+        assert AXIS_KEYPRESS_DICT[key_][0] in AXIS_CHOICES, '{} not found in AXIS_CHOICES. All keyboard shortcuts \
+for axes must have associated radio buttons!'.format(AXIS_KEYPRESS_DICT[key_][0])
 
     parser = argparse.ArgumentParser()
 
