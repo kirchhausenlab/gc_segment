@@ -23,15 +23,22 @@ from IPython.display import HTML
 import argparse
 from attr_dict import *
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 DEFAULT_HYPERPARAMS = {
     # Z-limits. Whether to crop the image along Z as well. If None,
     #    the entire stack is used.
     'z_limits': False,
 
-    # Compactness for SLIC segmentation.
-    'compactness': 10,
-    # Number of superpixels for SLIC segmentation.
+    # Compactness for SLIC segmentation. Higher value leads to more compact
+    # supervoxels
+    'compactness': 25,
+    # Number of superpixels for SLIC segmentation
     'n_superpixels': 4000,
 
 
@@ -210,6 +217,11 @@ def make_adjacency_matrix(L, n_jobs=32):
     return adj_mat
 
 
+def get_grey_value_from_indices(I, c, where):
+    px = I[where].mean()
+    return px
+
+
 def get_grey_value_(I, L, c):
     """
     Helper function that computes the grey value for superpixel c.
@@ -219,21 +231,29 @@ def get_grey_value_(I, L, c):
     px = I[where].mean()
 #    M                           = (L == c)
 #    px                          = (I * M).sum() / (M.sum() * 1.0)
-    return px
+    return px, where
 
 
-def get_grey_values(I, L, n_jobs=32):
+def get_grey_values(I, L, n_jobs=64, indices=None):
     # Get average grey values for every superpixel, and call it the grey value
     # for the superpixel
     n_superpixels = np.unique(L).size
     I_ = I.astype(np.float32).ravel()
     L_ = L.ravel()
-    # Parallelise over multiple CPUs.
-    with parallel_backend('threading', n_jobs=n_jobs):
-        grey_values = Parallel()(delayed(get_grey_value_)(I_, L_, c)
-                                 for c in range(n_superpixels))
 
-    return np.array(grey_values)
+    if indices is None:
+        # Parallelise over multiple CPUs.
+        with parallel_backend('threading', n_jobs=n_jobs):
+            results = Parallel()(delayed(get_grey_value_)(I_, L_, c)
+                                 for c in range(n_superpixels))
+        grey_values, wheres = zip(*results)
+        indices = wheres
+
+    else:
+        grey_values = [get_grey_value_from_indices(
+            I_, c, indices[c]) for c in range(n_superpixels)]
+
+    return np.array(grey_values), indices
 
 
 def compute_edge_contr(m, grey_values, N):
@@ -331,3 +351,13 @@ def place_gaussians(fg, sigmax=5, sigmay=5):
 
 #        G += place_gaussian(X, Y, x, y, sigmax=sigmax, sigmay=sigmay)
     return G
+
+
+def get_supervoxel_size(n_supervoxels, volume_size):
+    supervoxel_size = int(
+        np.floor((np.prod(volume_size) / n_supervoxels)**(1 / 3)))
+    logger.debug((
+        f'\n{n_supervoxels} requested, '
+        f'leads to supervoxel edge length of {supervoxel_size}'
+    ))
+    return supervoxel_size
