@@ -6,6 +6,7 @@ import imageio
 import sys
 import os
 from matplotlib.widgets import Slider, Button, RadioButtons, TextBox
+from matplotlib.backend_bases import MouseButton
 import time
 import argparse
 from utils import *
@@ -13,11 +14,16 @@ from utils import *
 
 IMAGE_RECTANGLE = [0.05, 0.20, 0.55, 0.75]
 
+MAX_AREA_DISPLAY_SIZE = 200
+
 
 FOREGROUND = 'Object'
 BACKGROUND = 'Background'
 ERASE = 'Erase'
 CLICK = 'Click'
+
+
+TICK_STEP = 20
 
 
 # Axes. 
@@ -237,11 +243,42 @@ class VolumeAnnotator(object):
         self.disp_stack_ = np.stack(
             (self.disp_stack_, self.disp_stack_, self.disp_stack_)).transpose([1, 2, 3, 0])
 
+
+        # Initialise the viewing rectangle. This is a new addition (2020-10-19)
+        #   to help focus on smaller regions during annotation of big volumes. 
+        #
+        # In essence, this restricts the viewing rectangle to a maximum 
+        #   size determined by MAX_AREA_DISPLAY_SIZE
+        self.x_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.W)
+        self.y_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.H)
+        self.z_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.n_slices)
+        # Keep one tuple for each viewing axis. This tuple defines the top-left 
+        #   corner of the viewing volume depending on the axis. The depth of 
+        #   this volume is all planes. 
+        self.viewing_rect   = {}
+        for axis_ in AXIS_CHOICES:
+            self.viewing_rect[axis_] = [0, 0]
+        # When we use the move function to move around in the volume, these
+        #    values will be changed. 
+    
+        # Define viewing rectangle sizes depending on the viewing axis. 
+        self.view_sizes     = {}
+        self.view_sizes[X]  = [self.y_view_size, self.z_view_size]
+        self.view_sizes[Y]  = [self.x_view_size, self.z_view_size]
+        self.view_sizes[Z]  = [self.x_view_size, self.y_view_size]
+
+        # Define stack sizes according to viewing axis. 
+        self.stack_sizes    = {}
+        self.stack_sizes[X] = [self.stack_height, self.stack_depth]
+        self.stack_sizes[Y] = [self.stack_width, self.stack_depth]
+        self.stack_sizes[Z] = [self.stack_width, self.stack_height]
+
+
         # Dictionary to determine which annotation volume to contribute to.
         self.annotation_volume_dict = {
             FOREGROUND:   self.fg_annotation_,
             BACKGROUND:   self.bg_annotation_,
-        }
+       }
         # Which channels to modify in disp_stack_ for FG and BG.
         self.fg_channel = 2         # Blue
         self.bg_channel = 0         # Red
@@ -266,7 +303,8 @@ class VolumeAnnotator(object):
         self.brush_size_ = 1
 
         # Whether mouse is currently pressed.
-        self.mouse_pressed_ = False
+        self.mouse_primary_pressed_ = False
+        self.mouse_secondary_pressed_ = False
 
         # Set self.initialised_ to False, meaning the figure has not been initialised yet.
         self.initialised_ = False
@@ -311,28 +349,42 @@ class VolumeAnnotator(object):
         axis_switch: whether viewing axis has been switched to make this call. 
         """
         if self.view_axis_ == X:
-            if axis_switch:
-                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
-                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[:, :, self.x_, :],
-                                                       cmap=self.im_cmap_)
-            else:
-                self.image_handle_.set_data(self.disp_stack_[:, :, self.x_, :])
-        elif self.view_axis_ == Y:
-            if axis_switch:
-                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
-                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[:, self.y_, :, :],
-                                                       cmap=self.im_cmap_)
-            else:
-                self.image_handle_.set_data(self.disp_stack_[:, self.y_, :, :])
-        elif self.view_axis_ == Z:
-            if axis_switch:
-                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
-                self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
-                                                       cmap=self.im_cmap_)
-            else:
-                self.image_handle_.set_data(self.disp_stack_[self.z_, :, :, :])
+            # Determine the viewing rectangle. 
+            y_min, z_min = self.viewing_rect[self.view_axis_]
+            y_max        = y_min + self.y_view_size
+            z_max        = z_min + self.z_view_size
 
-#        self.ax_image_.axis('equal')
+            display_stack_ = self.disp_stack_[z_min:z_max, y_min:y_max, self.x_, :]
+
+        elif self.view_axis_ == Y:
+            # Determine the viewing rectangle. 
+            x_min, z_min = self.viewing_rect[self.view_axis_]
+            x_max        = x_min + self.x_view_size
+            z_max        = z_min + self.z_view_size
+
+            display_stack_ = self.disp_stack_[z_min:z_max, self.y_, x_min:x_max, :]
+
+        elif self.view_axis_ == Z:
+            # Determine the viewing rectangle. 
+            x_min, y_min = self.viewing_rect[self.view_axis_]
+            x_max        = x_min + self.x_view_size
+            y_max        = y_min + self.y_view_size
+
+            display_stack_ = self.disp_stack_[self.z_, y_min:y_max, x_min:x_max, :]
+
+
+
+        if axis_switch:
+#            self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+            self.ax_image_ = plt.axes(self.ax_image_)
+            self.image_handle_ = self.ax_image_.imshow(display_stack_,
+                                                   cmap=self.im_cmap_)
+        else:
+            self.image_handle_.set_data(display_stack_)
+
+
+        print('display_stack_:', display_stack_.shape)
+        self._set_axis_ticks()
         self._set_axis_labels()
         self.figure_.canvas.draw_idle()
         return
@@ -362,8 +414,21 @@ class VolumeAnnotator(object):
 
         # Check whether event occurs over ax_image_
         if event.inaxes == self.ax_image_:
-            self.mouse_pressed_ = True
-            self.annotate_patch(event.xdata, event.ydata)
+            # Check if the primary or secondary button is pressed. 
+            if event.button == MouseButton.LEFT:
+                # This button press shall be used for annotation. 
+                self.mouse_primary_pressed_ = True
+                self.annotate_patch(event.xdata, event.ydata)
+            # Check if secondary was pressed instead. 
+            elif event.button == MouseButton.RIGHT:
+                self.mouse_secondary_pressed_ = True
+                # Save the location where this button was pressed. 
+                # This will be used to determine how to move
+                #   the image. 
+                self.move_image_location_ = [int(np.floor(event.xdata)), 
+                                           int(np.floor(event.ydata))]
+                # Save the viewing rectangle at this point. 
+                self.move_viewing_rect_ = self.viewing_rect[self.view_axis_]
 
         return
 
@@ -377,14 +442,21 @@ class VolumeAnnotator(object):
         # First, make sure the figure has been initialised.
         assert self.initialised_, 'Figure has not been initialised yet!'
 
-        if not self.mouse_pressed_ or event.inaxes != self.ax_image_:
+        if (not self.mouse_primary_pressed_ and not self.mouse_secondary_pressed_) \
+                or event.inaxes != self.ax_image_:
             return
 
-        # Do nothing if ann_mode_ is CLICK.
-        if self.ann_mode_ == CLICK:
-            return
-
-        self.annotate_patch(event.xdata, event.ydata)
+        # If the primary button is pressed, annotate. 
+        if self.mouse_primary_pressed_:
+            # Do nothing if ann_mode_ is CLICK.
+            if self.ann_mode_ == CLICK:
+                return
+    
+            self.annotate_patch(event.xdata, event.ydata)
+        # If the secondary button is pressed, move
+        elif self.mouse_secondary_pressed_:
+            # Call the move function 
+            self.move_image(event.xdata, event.ydata)
 
         return
 
@@ -397,13 +469,21 @@ class VolumeAnnotator(object):
         # First, make sure the figure has been initialised.
         assert self.initialised_, 'Figure has not been initialised yet!'
 
-        self.mouse_pressed_ = False
-        # Mark this plane as annotated if it still contains any annotations.
+        # Check which mouse button was pressed. 
+        if self.mouse_primary_pressed_:
+            # The button had been pressed to annotate. 
+            self.mouse_primary_pressed_ = False
+            # Mark this plane as annotated if it still contains any annotations.
+    
+            if self.fg_annotation_[self.z_].sum() > 0 or self.bg_annotation_[self.z_].sum() > 0:
+                self.annotated_planes_[self.z_] = True
+            else:
+                self.annotated_planes_[self.z_] = False
+        elif self.mouse_secondary_pressed_:
+            self.mouse_secondary_pressed_ = False
+            # Just call _update_figure() one last time. 
+            self._update_figure()
 
-        if self.fg_annotation_[self.z_].sum() > 0 or self.bg_annotation_[self.z_].sum() > 0:
-            self.annotated_planes_[self.z_] = True
-        else:
-            self.annotated_planes_[self.z_] = False
         return
 
     def annotate_patch(self, xloc, yloc):
@@ -411,6 +491,8 @@ class VolumeAnnotator(object):
         Annotate patch centered at (xloc, yloc). 
         Uses current state to determine what kind of annotation will be done. 
         """
+
+        # TODO: The annotation is dependent on the viewing rectangle. 
 
         # Find where the event occurred.
         loc_x_, loc_y_ = xloc, yloc
@@ -508,6 +590,63 @@ class VolumeAnnotator(object):
 
         # Update display.
         self._update_figure()
+
+    def move_image(self, 
+                   xloc, yloc):
+        """
+        Move the viewing area depending on xloc and yloc. 
+        """
+
+        # First, make sure the figure has been initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # Convert xloc and yloc to integers
+        xloc    = int(np.floor(xloc))
+        yloc    = int(np.floor(yloc))
+        # Get the original click location for the move. 
+        ref_move_x, ref_move_y = self.move_image_location_
+
+        # The amount to move along X or Y is now dependent on where the current
+        #   location of the mouse is relative to this. 
+        # After the image has been moved, the original location must 
+        #   occur at the current location. That is to say, the mouse
+        #   should "stick to" the original location. 
+        #
+        # To achieve this, we must move the coordinates of the viewing 
+        #   rectangle. 
+
+        # Get the current viewing rectangle. 
+        view_rect_x, view_rect_y = self.move_viewing_rect_
+        # Get the difference between xloc and ref_move_x, and similarly for y. 
+        move_x      = ref_move_x - xloc
+        move_y      = ref_move_y - yloc
+        # The new location is the old location plus this difference
+        new_loc_x   = view_rect_x + move_x
+        new_loc_y   = view_rect_y + move_y
+
+        # New locations are view_rect_x + move_x and view_rect_y + move_y. 
+        # But these must be kept within bounds [0, self.self.<axis>_view_size]
+        
+        # Lower bound it first. 
+        new_loc_x      = bound_low(new_loc_x, 0)
+        new_loc_y      = bound_low(new_loc_y, 0)
+
+        # Upper bound it now, depending on the axis. 
+        x_view_size, y_view_size = self.view_sizes[self.view_axis_]
+        x_size, y_size           = self.stack_sizes[self.view_axis_]
+        new_loc_x  = bound_high(new_loc_x, x_size - x_view_size)
+        new_loc_y  = bound_high(new_loc_y, y_size - y_view_size)
+
+        # Store the new location
+        self.viewing_rect[self.view_axis_] = [new_loc_x, new_loc_y]
+        
+        # Store xloc, yloc as the new move_location_
+        self.move_location_ = [xloc, yloc]
+        
+        # Update the figure
+        self._update_figure()
+        return
+
 
     def _handle_ann_mode_radio(self,
                                label):
@@ -675,11 +814,16 @@ class VolumeAnnotator(object):
         assert self.initialised_, 'Figure has not been initialised yet!'
 
         label, index = AXIS_KEYPRESS_DICT[key]
+        if self.view_axis_ == label:
+            # Current viewing is already the same as the chosen one. 
+            # Do nothing.
+            return 
+
         # Set the viewing axis. 
         self.view_axis_ = label
         self.axis_mode_radio_.set_active(index)
         # The figure needs to be updated too. 
-        self._update_figure()
+        self._update_figure(axis_switch=True)
         return 
 
 
@@ -957,6 +1101,48 @@ class VolumeAnnotator(object):
             self.ax_image_.set_xlabel(X)
             self.ax_image_.set_ylabel(Y)
 
+    def _set_axis_ticks(self):
+        """
+        Set axis tick labels according to the viewing rectangle.
+
+        The ticks are always set to be at multiples of five.
+        """
+        
+        x_start, y_start = self.viewing_rect[self.view_axis_]
+        print(x_start, y_start)
+
+        rem_x = x_start % TICK_STEP
+        rem_y = y_start % TICK_STEP
+
+        x_start_tick = (TICK_STEP - rem_x) % TICK_STEP
+        y_start_tick = (TICK_STEP - rem_y) % TICK_STEP
+
+        x_view_size, y_view_size = self.view_sizes[self.view_axis_]    
+
+        x_ticks = np.arange(x_start_tick, x_view_size+1, TICK_STEP)
+        y_ticks = np.arange(y_start_tick, y_view_size+1, TICK_STEP)
+
+        x_tick_labels = [str(x + x_start) for x in x_ticks]
+        y_tick_labels = [str(y + y_start) for y in y_ticks]
+
+#        self.ax_image_.set_yticks([])
+#        self.ax_image_.set_yticks(y_ticks)
+        print('get_xticks: ', self.ax_image_.get_xticks())
+        print('get_yticks: ', self.ax_image_.get_yticks())
+        print(self.ax_image_)
+#        self.ax_image_.set_yticklabels(y_tick_labels)
+
+#        self.ax_image_.set_xticks(x_ticks)
+#        self.ax_image_.set_xticklabels(x_tick_labels)
+
+
+        print('y_ticks: ', y_ticks)
+        print('y_tick_labels: ', y_tick_labels)
+
+        return
+
+
+
     # Initialise pyplot figure and run the GUI.
 
     def __call__(self):
@@ -982,11 +1168,16 @@ class VolumeAnnotator(object):
         # Create axes for image.
         self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
         # Initialise with the current slice.
-        self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, :, :, :],
+        orig_x_min, orig_y_min = self.viewing_rect[Z]
+        orig_x_max             = orig_x_min + self.x_view_size
+        orig_y_max             = orig_y_min + self.y_view_size
+        
+        self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, orig_y_min:orig_y_max, orig_x_min:orig_x_max, :],
                                                    cmap=self.im_cmap_)
-
-        # Set dimension names. This should be done according to the viewing axis. 
+        self._set_axis_ticks()
         self._set_axis_labels()
+        # The above was replaced with the following
+#        self._update_figure(axis_switch=True)
 
         # ================================
         #   Create axes for X-slider
