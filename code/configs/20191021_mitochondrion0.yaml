@@ -1,4 +1,4 @@
-data_path:  /home/tkadmin/mihir/data/20191021/03/
+data_path:  /scratch/ben/20191021/03/
 coords: [2320, 845, 398, 240]
 z_limits: [126, 560]
 n_superpixels: 12000

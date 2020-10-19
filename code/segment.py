@@ -2,6 +2,7 @@ from utils import *
 from VolumeAnnotator import *
 import pickle
 import time
+import numpy as np
 
 import threading
 import time
@@ -12,10 +13,16 @@ import argparse
 import maxflow
 import logging
 import numpy as np
+import SimpleITK as sitk
+
+from funlib.segment.arrays import replace_values
+
+import visualization_utils
+from utils import get_supervoxel_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 anim_done_ = False
@@ -94,6 +101,7 @@ class SegmentationModule(object):
         #   Variables of this class to be saved.
         self.save_vars = [
             'labels1',
+            'supervoxel_indices',
             'adj_mat',
             'spx_locations',
             'grey_v_px',
@@ -123,7 +131,7 @@ class SegmentationModule(object):
         save_dict = self.make_save_dict()
         try:
             with open(self.save_vars_path, 'wb') as fp:
-                pickle.dump(save_dict, fp)
+                pickle.dump(save_dict, fp, protocol=4)
         except Exception as E:
             write_fail()
             print('Could not save variables. Got error {}'.format(E))
@@ -193,6 +201,7 @@ class SegmentationModule(object):
             tif_stack.append(img[None, ...])
         image = np.concatenate(tif_stack, axis=0)
 
+        logger.info(f'image shape {image.shape}')
         write_okay()
         # ====================================================================
 
@@ -203,23 +212,51 @@ class SegmentationModule(object):
         align_left('Discovering supervoxels')
         start_time = time.time()
         if self.labels1 is None:
-            # TODO use a proper rgb transformation. Put a breakpoint here to
-            # check out the 3 channels. They should not be all the same
-            rgb = np.concatenate((image[..., None],
-                                  image[..., None],
-                                  image[..., None]), axis=3)
 
-            self.labels1 = sksegmentation.slic(
-                rgb,
-                compactness=self.options.compactness,
-                n_segments=self.options.n_superpixels,
-                enforce_connectivity=True,
-                convert2lab=True,
-                multichannel=True)
-            logger.info(
-                f'Number of generated supervoxels: {len(np.unique(self.labels1))}'
+            supervoxel_size = get_supervoxel_size(
+                self.options.n_superpixels,
+                image.shape
             )
-            logger.debug(f'Supervoxel labels dtype {self.labels1.dtype}')
+
+            sitk_img = sitk.GetImageFromArray(image)
+            logger.debug(
+                f'sitk image size {sitk_img.GetSize()}')
+            logger.debug(
+                f'sitk image dtype {sitk_img.GetPixelIDTypeAsString()}')
+
+            # TODO port relevant params into config
+            slic = sitk.SLICImageFilter()
+            slic.SetSpatialProximityWeight(self.options.compactness)
+            slic.SetSuperGridSize([supervoxel_size] * 3)
+            slic.SetEnforceConnectivity(True)
+            slic.SetNumberOfThreads(self.options.n_jobs)
+            slic.SetMaximumNumberOfIterations(10)
+
+            sitk_labels = slic.Execute(sitk_img)
+            numpy_labels = sitk.GetArrayFromImage(sitk_labels)
+
+            # TODO not sure if type casting is necessary, this is simply
+            # matching the sklearn output dtype
+            self.labels1 = numpy_labels.astype('int64')
+
+            debug_start_time = time.time()
+            old_values = np.unique(self.labels1)
+            # this currently needs a boost install via apt
+            replace_values(
+                in_array=self.labels1,
+                inplace=True,
+                old_values=old_values,
+                new_values=np.arange(len(old_values), dtype=old_values.dtype))
+
+            logger.debug((
+                'Replacing supervoxel ids to be contiguous took '
+                f'{time.time() - debug_start_time} s'
+            ))
+
+            logger.info(
+                f'\nNumber of generated supervoxels: {len(np.unique(self.labels1))}'
+            )
+
         write_done(start_time)
         print(
             'Size of the volume is Z: %d, Y: %d, X: %d' %
@@ -282,7 +319,7 @@ class SegmentationModule(object):
         align_left('Compting grey values for supervoxels')
         start_time = time.time()
         if self.grey_v_px is None:
-            self.grey_v_px = get_grey_values(
+            self.grey_v_px, self.supervoxel_indices = get_grey_values(
                 image, self.labels1, n_jobs=self.options.n_jobs)
         write_done(start_time)
         # ====================================================================
@@ -295,20 +332,29 @@ class SegmentationModule(object):
                                      range(image.shape[0]),
                                      range(image.shape[2]))
             align_left('Compting x-coordinate of centres of supervoxels')
-            spx_x_coord = get_grey_values(
-                X_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_x_coord, _ = get_grey_values(
+                X_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
 
             start_time = time.time()
             align_left('Compting y-coordinate of centres of supervoxels')
-            spx_y_coord = get_grey_values(
-                Y_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_y_coord, _ = get_grey_values(
+                Y_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
 
             start_time = time.time()
             align_left('Compting z-coordinate of centres of supervoxels')
-            spx_z_coord = get_grey_values(
-                Z_, self.labels1, n_jobs=self.options.n_jobs)
+            spx_z_coord, _ = get_grey_values(
+                Z_,
+                self.labels1,
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)
             write_done(start_time)
             self.spx_locations = np.concatenate((spx_x_coord[..., None],
                                                  spx_y_coord[..., None],
@@ -347,7 +393,7 @@ class SegmentationModule(object):
             elif 'Background' in f_path and anno_plane < image.shape[0]:
                 bg_img[anno_plane, :, :] = anno_img
     #        else:
-    #            raise ValueError('Could not understand annotation file %s' %(f_path))
+    # raise ValueError('Could not understand annotation file %s' %(f_path))
         write_done(start_time)
         # ====================================================================
 
@@ -362,10 +408,10 @@ class SegmentationModule(object):
         # bg_img[-1,:,:]    = bg_img_anno_last
 
         # Using gaussians - wrong.
-        #fg_inv_energy = place_gaussians(fg_img, sigmax=50, sigmay=50)
-        #bg_inv_energy = place_gaussians(bg_img, sigmax=50, sigmay=50)
-        #fg_inv_prob = np.exp(-fg_inv_energy)
-        #bg_inv_prob = np.exp(-bg_inv_energy)
+        # fg_inv_energy = place_gaussians(fg_img, sigmax=50, sigmay=50)
+        # bg_inv_energy = place_gaussians(bg_img, sigmax=50, sigmay=50)
+        # fg_inv_prob = np.exp(-fg_inv_energy)
+        # bg_inv_prob = np.exp(-bg_inv_energy)
 
         # Using distance transform
         # ====================================================================
@@ -388,13 +434,16 @@ class SegmentationModule(object):
             get_grey_values(
                 fg_inv_prob,
                 self.labels1,
-                n_jobs=self.options.n_jobs))
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)[0])
         bg_inv_prob_spx = np.log(
             1 +
             get_grey_values(
                 bg_inv_prob,
                 self.labels1,
-                n_jobs=self.options.n_jobs))
+                n_jobs=self.options.n_jobs,
+                indices=self.supervoxel_indices)[0])
+
         self.fg_inv_prob_spx = fg_inv_prob_spx
         self.bg_inv_prob_spx = bg_inv_prob_spx
         write_done(start_time)
@@ -444,10 +493,16 @@ class SegmentationModule(object):
         # ====================================================================
         align_left('Computing histogram unaries')
         start_time = time.time()
-        fg_unaries = get_grey_values(fg_pix_unaries, self.labels1,
-                                     n_jobs=self.options.n_jobs)
-        bg_unaries = get_grey_values(bg_pix_unaries, self.labels1,
-                                     n_jobs=self.options.n_jobs)
+        fg_unaries, _ = get_grey_values(
+            fg_pix_unaries,
+            self.labels1,
+            n_jobs=self.options.n_jobs,
+            indices=self.supervoxel_indices)
+        bg_unaries, _ = get_grey_values(
+            bg_pix_unaries,
+            self.labels1,
+            n_jobs=self.options.n_jobs,
+            indices=self.supervoxel_indices)
         write_done(start_time)
 
         self.fg_unaries = fg_unaries
@@ -469,11 +524,15 @@ class SegmentationModule(object):
         # cells_per_block=(1, 1), visualize=True, feature_vector=False,
         # multichannel=False)
 
-        # fd_ex = cv2.resize(fd[:,:,0,0,0], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)
+        # fd_ex = cv2.resize(fd[:,:,0,0,0], (img.shape[1], img.shape[0]),
+        # interpolation=cv2.INTER_NEAREST)
 
-        # fd_ex = np.concatenate([cv2.resize(fd[:,:,0,0,i], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_NEAREST)[...,None] for i in range(16)], axis=-1)
+        # fd_ex = np.concatenate([cv2.resize(fd[:,:,0,0,i], (img.shape[1],
+        # img.shape[0]), interpolation=cv2.INTER_NEAREST)[...,None] for i in
+        # range(16)], axis=-1)
 
-        # fd_sp = np.concatenate([get_grey_values(fd_ex[:,:,i], self.labels1)[...,None] for i in range(16)], axis=-1)
+        # fd_sp = np.concatenate([get_grey_values(fd_ex[:,:,i],
+        # self.labels1)[...,None] for i in range(16)], axis=-1)
 
         # _, hog_pw = get_pairwise_costs(fd_sp, self.spx_locations, self.adj_mat, 1, img.shape[:2], sigma=10)
         # hog_pw = np.array(hog_pw)
@@ -541,7 +600,7 @@ class SegmentationModule(object):
                 'Limits of pairwise terms',
                 pw_costs.min(),
                 pw_costs.max()))
-        #print(hog_pw.min(), hog_pw.max())
+        # print(hog_pw.min(), hog_pw.max())
 
         # ====================================================================
         #   Compute max flow
@@ -625,7 +684,9 @@ class SegmentationModule(object):
                         os.makedirs(dir_)
 
                 for s in range(image.shape[0]):
-                    #                oimg                = imageio.imread(os.path.join(self.data_path, orig_file_list[s+z_limits[0]]))
+                    # oimg                =
+                    # imageio.imread(os.path.join(self.data_path,
+                    # orig_file_list[s+z_limits[0]]))
                     mask0 = label_img[s, :, :]
 
                     mask_img[:, :] = mask0 * 255
