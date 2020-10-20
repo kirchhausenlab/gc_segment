@@ -384,8 +384,11 @@ class VolumeAnnotator(object):
 
 
         if axis_switch:
-#            self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
-            self.ax_image_ = plt.axes(self.ax_image_)
+            if self.ax_image_ is None: 
+                self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+            else:
+                self.ax_image_ = plt.axes(self.ax_image_)
+
             self.ax_image_.margins(x=0, y=0, tight=True)
             self.image_handle_ = self.ax_image_.imshow(display_stack_,
                                                    cmap=self.im_cmap_,
@@ -1211,20 +1214,9 @@ class VolumeAnnotator(object):
         self.axes_.set_facecolor(self.face_colour_)
 
         # Create axes for image.
-        self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
-        self.ax_image_.margins(x=0, y=0, tight=True)
-        # Initialise with the current slice.
-        orig_x_min, orig_y_min = self.viewing_rect[Z]
-        orig_x_max             = orig_x_min + self.x_view_size
-        orig_y_max             = orig_y_min + self.y_view_size
-        
-        self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, orig_y_min:orig_y_max, orig_x_min:orig_x_max, :],
-                                                   cmap=self.im_cmap_, 
-                                                   aspect='equal')
-        self._set_axis_ticks()
-        self._set_axis_labels()
         # The above was replaced with the following
-#        self._update_figure(axis_switch=True)
+        self.ax_image_ = None
+        self._update_figure(axis_switch=True)
 
         # ================================
         #   Create axes for X-slider
