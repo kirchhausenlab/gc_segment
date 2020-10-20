@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
-import cv2
 import imageio
 import sys
 import os
@@ -12,10 +11,9 @@ import argparse
 from utils import *
 
 
-IMAGE_RECTANGLE = [0.05, 0.20, 0.55, 0.75]
+IMAGE_RECTANGLE = [0.05, 0.20, 0.60, 0.75]
 
-MAX_AREA_DISPLAY_SIZE = 200
-
+KEYPRESS_MOVE_STEP  = 5
 
 FOREGROUND = 'Object'
 BACKGROUND = 'Background'
@@ -48,9 +46,17 @@ PLANES_KEYPRESS_DICT = {
     'z':   1,
     'm': -1,
 }
+MOVE_KEYPRESS_DICT = {
+    'up':       [ 0, -KEYPRESS_MOVE_STEP],
+    'down':     [ 0,  KEYPRESS_MOVE_STEP],
+    'left':     [-KEYPRESS_MOVE_STEP,  0],
+    'right':    [ KEYPRESS_MOVE_STEP,  0],
+}
+
 RECOGNISED_KEYBOARD_SHORTCUTS = list(ANNO_KEYPRESS_DICT.keys()) + \
     list(PLANES_KEYPRESS_DICT.keys())  + \
-    list(AXIS_KEYPRESS_DICT)     # + <other keyboard shorcuts>
+    list(AXIS_KEYPRESS_DICT)           + \
+    list(MOVE_KEYPRESS_DICT)            # + <other keyboard shorcuts>
 
 FOREGROUND_NAMES = [FOREGROUND, 'Foreground']
 ANNO_DIR = 'annotation/'
@@ -180,6 +186,9 @@ class VolumeAnnotator(object):
             'm_top_':   0.95,
             # Margin bottom.
             'm_bottom_':   0.05,
+
+            # Maximum display size of the viewing area
+            'max_area_display_size':    200,
         }
         # Set kwargs.
         for k in default_kwargs_:
@@ -248,10 +257,10 @@ class VolumeAnnotator(object):
         #   to help focus on smaller regions during annotation of big volumes. 
         #
         # In essence, this restricts the viewing rectangle to a maximum 
-        #   size determined by MAX_AREA_DISPLAY_SIZE
-        self.x_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.W)
-        self.y_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.H)
-        self.z_view_size    = min(MAX_AREA_DISPLAY_SIZE, self.n_slices)
+        #   size determined by self.max_area_display_size
+        self.x_view_size    = min(self.max_area_display_size, self.W)
+        self.y_view_size    = min(self.max_area_display_size, self.H)
+        self.z_view_size    = min(self.max_area_display_size, self.n_slices)
         # Keep one tuple for each viewing axis. This tuple defines the top-left 
         #   corner of the viewing volume depending on the axis. The depth of 
         #   this volume is all planes. 
@@ -383,7 +392,6 @@ class VolumeAnnotator(object):
             self.image_handle_.set_data(display_stack_)
 
 
-        print('display_stack_:', display_stack_.shape)
         self._set_axis_ticks()
         self._set_axis_labels()
         self.figure_.canvas.draw_idle()
@@ -456,7 +464,7 @@ class VolumeAnnotator(object):
         # If the secondary button is pressed, move
         elif self.mouse_secondary_pressed_:
             # Call the move function 
-            self.move_image(event.xdata, event.ydata)
+            self.move_image(location=[event.xdata, event.ydata], displacement=None)
 
         return
 
@@ -499,14 +507,17 @@ class VolumeAnnotator(object):
         loc_x_ = int(np.floor(loc_x_))
         loc_y_ = int(np.floor(loc_y_))
 
+        # Get the viewing window. 
+        ref_win_x, ref_win_y = self.viewing_rect[self.view_axis_]
+
         # Find coordinates of box to annotate.
         bs2_ = (self.brush_size_ + 1) // 2
 
-        col_s_ = max([loc_x_ - bs2_ + 1, 0])
-        col_e_ = min([loc_x_ + bs2_, self.stack_width])
+        col_s_ = max([ref_win_x + loc_x_ - bs2_ + 1, 0])
+        col_e_ = min([ref_win_x + loc_x_ + bs2_, self.stack_width])
 
-        row_s_ = max([loc_y_ - bs2_ + 1, 0])
-        row_e_ = min([loc_y_ + bs2_, self.stack_height])
+        row_s_ = max([ref_win_y + loc_y_ - bs2_ + 1, 0])
+        row_e_ = min([ref_win_y + loc_y_ + bs2_, self.stack_height])
 
         # Record annotation. This is dependent on what is the current viewing axis. 
 
@@ -592,34 +603,56 @@ class VolumeAnnotator(object):
         self._update_figure()
 
     def move_image(self, 
-                   xloc, yloc):
+                   location=None, displacement=None):
         """
         Move the viewing area depending on xloc and yloc. 
+
+        location is used when moving with the mouse. It should be a list/tuple 
+        [xloc, yloc]. 
+
+        displacement is used when moving with the arrow keys. 
+        It should be a tuple [xdisp, ydisp]
         """
 
         # First, make sure the figure has been initialised.
         assert self.initialised_, 'Figure has not been initialised yet!'
 
-        # Convert xloc and yloc to integers
-        xloc    = int(np.floor(xloc))
-        yloc    = int(np.floor(yloc))
-        # Get the original click location for the move. 
-        ref_move_x, ref_move_y = self.move_image_location_
+        if location is not None:
+            xloc, yloc  = location
 
-        # The amount to move along X or Y is now dependent on where the current
-        #   location of the mouse is relative to this. 
-        # After the image has been moved, the original location must 
-        #   occur at the current location. That is to say, the mouse
-        #   should "stick to" the original location. 
-        #
-        # To achieve this, we must move the coordinates of the viewing 
-        #   rectangle. 
+            # Convert xloc and yloc to integers
+            xloc    = int(np.floor(xloc))
+            yloc    = int(np.floor(yloc))
+            # Get the original click location for the move. 
+            ref_move_x, ref_move_y = self.move_image_location_
+    
+            # The amount to move along X or Y is now dependent on where the current
+            #   location of the mouse is relative to this. 
+            # After the image has been moved, the original location must 
+            #   occur at the current location. That is to say, the mouse
+            #   should "stick to" the original location. 
+            #
+            # To achieve this, we must move the coordinates of the viewing 
+            #   rectangle. 
+    
+            # Get the current viewing rectangle. 
+            view_rect_x, view_rect_y = self.move_viewing_rect_
+            # Get the difference between xloc and ref_move_x, and similarly for y. 
+            move_x      = ref_move_x - xloc
+            move_y      = ref_move_y - yloc
 
-        # Get the current viewing rectangle. 
-        view_rect_x, view_rect_y = self.move_viewing_rect_
-        # Get the difference between xloc and ref_move_x, and similarly for y. 
-        move_x      = ref_move_x - xloc
-        move_y      = ref_move_y - yloc
+            # Store xloc, yloc as the new move_location_
+            self.move_location_ = [xloc, yloc]
+ 
+        elif displacement is not None:
+            view_rect_x, view_rect_y    = self.viewing_rect[self.view_axis_]
+            move_x, move_y = displacement
+            move_x      = int(np.floor(move_x))
+            move_y      = int(np.floor(move_y))
+
+        else:
+            raise ValueError('One of location and displacement must be specified when calling move_image!')
+
         # The new location is the old location plus this difference
         new_loc_x   = view_rect_x + move_x
         new_loc_y   = view_rect_y + move_y
@@ -639,10 +672,8 @@ class VolumeAnnotator(object):
 
         # Store the new location
         self.viewing_rect[self.view_axis_] = [new_loc_x, new_loc_y]
-        
-        # Store xloc, yloc as the new move_location_
-        self.move_location_ = [xloc, yloc]
-        
+            
+       
         # Update the figure
         self._update_figure()
         return
@@ -785,6 +816,8 @@ class VolumeAnnotator(object):
             return self._handle_planes_keyboard_shortcuts(event.key)
         if event.key in AXIS_KEYPRESS_DICT:
             return self._handle_axis_keyboard_shortcuts(event.key)
+        if event.key in MOVE_KEYPRESS_DICT:
+            return self._handle_move_keyboard_shortcuts(event.key)
 
         # Can add other functions here.
         return
@@ -858,6 +891,25 @@ class VolumeAnnotator(object):
         self._update_figure()
 
         return
+
+    def _handle_move_keyboard_shortcuts(self,
+                                        key):
+
+        """
+        Handle moving along the image using keyboard shortcuts. 
+        'up' and 'down' keys move in -1 and +1 along Y, respectively. 
+        'left', and 'right' keys move in -1 and +1 along X, respectively.
+        """
+
+        # First, make sure the figure is initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # Get the displacement from the MOVE_KEYPRESS_DICT
+        displacement    = MOVE_KEYPRESS_DICT[key]
+        # Move in the image according to the displacement. 
+        self.move_image(displacement=displacement, location=None)
+        return 
+            
 
 
     # Handle x slider.
@@ -1109,7 +1161,6 @@ class VolumeAnnotator(object):
         """
         
         x_start, y_start = self.viewing_rect[self.view_axis_]
-        print(x_start, y_start)
 
         rem_x = x_start % TICK_STEP
         rem_y = y_start % TICK_STEP
@@ -1119,25 +1170,17 @@ class VolumeAnnotator(object):
 
         x_view_size, y_view_size = self.view_sizes[self.view_axis_]    
 
-        x_ticks = np.arange(x_start_tick, x_view_size+1, TICK_STEP)
-        y_ticks = np.arange(y_start_tick, y_view_size+1, TICK_STEP)
+        x_ticks = np.arange(x_start_tick, x_view_size, TICK_STEP)
+        y_ticks = np.arange(y_start_tick, y_view_size, TICK_STEP)
 
         x_tick_labels = [str(x + x_start) for x in x_ticks]
         y_tick_labels = [str(y + y_start) for y in y_ticks]
 
-#        self.ax_image_.set_yticks([])
-#        self.ax_image_.set_yticks(y_ticks)
-        print('get_xticks: ', self.ax_image_.get_xticks())
-        print('get_yticks: ', self.ax_image_.get_yticks())
-        print(self.ax_image_)
-#        self.ax_image_.set_yticklabels(y_tick_labels)
+        self.ax_image_.set_yticks(y_ticks)
+        self.ax_image_.set_yticklabels(y_tick_labels)
 
-#        self.ax_image_.set_xticks(x_ticks)
-#        self.ax_image_.set_xticklabels(x_tick_labels)
-
-
-        print('y_ticks: ', y_ticks)
-        print('y_tick_labels: ', y_tick_labels)
+        self.ax_image_.set_xticks(x_ticks)
+        self.ax_image_.set_xticklabels(x_tick_labels)
 
         return
 
