@@ -14,6 +14,12 @@
        size is the same, in a way, this 
        config option handles the amount 
        of zoom-in and zoom-out. 
+    2. Moved sliders from bottom to the right
+       and expanded the display figure a bit. 
+       I am not happy about the negative 
+       coordinates used in IMAGE_RECTANGLE.
+       It should be examined for future
+       releases. 
         
 2020-10-17:
     Several changes in this version: 
