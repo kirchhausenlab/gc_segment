@@ -1,0 +1,43 @@
+2020-10-20: 
+    1. Added the move function using which 
+       one can move around in the viewing
+       plane. To activate, press the 
+       right mouse button (left one for left-
+       handed users) and drag the volume. 
+       Also activated using arrow keys to 
+       move up, down, left and right. 
+       The size of the viewing area
+       can be specified using the config
+       option max_area_display_size in the 
+       .yaml file. The default value for 
+       this parameter is 200. As the figure
+       size is the same, in a way, this 
+       config option handles the amount 
+       of zoom-in and zoom-out. 
+        
+2020-10-17:
+    Several changes in this version: 
+    1. The viewing axis can now be 
+       changed. The default viewing
+       axis is Z. It can be changed
+       using the new radio buttons on
+       the right. Also, keyboard short-
+       cuts 0, 1, 2 can be used to set
+       the viewing axis to X, Y, and
+       Z, respectively.
+
+    2. New sliders were added for
+       X, Y, and Z planes. Changing
+       the corresponding slider 
+       according to a viewing axis 
+       will move through the planes. 
+       Also, the sliders will maintain
+       their values when the viewing axis
+       is changed. 
+
+    3. A new scroll feature for the 
+       brush size was added. When the mouse
+       is held over the brush size slider
+       and moved up, the brush size is 
+       incresed. It is decreased when the 
+       mouse wheel is moved down. 
