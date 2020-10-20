@@ -11,7 +11,7 @@ import argparse
 from utils import *
 
 
-IMAGE_RECTANGLE = [-0.10, 0.10, 0.85, 0.85]
+IMAGE_RECTANGLE = [0.03, 0.10, 0.60, 0.70]
 
 KEYPRESS_MOVE_STEP  = 5
 
@@ -168,7 +168,7 @@ class VolumeAnnotator(object):
         # Default kwargs.
         default_kwargs_ = {
             # Size of the figure
-            'figure_size_':   [15, 10],
+            'figure_size_':   [18, 10],
 
             # Colour map to display image.
             'im_cmap_':   'hsv',
@@ -179,13 +179,13 @@ class VolumeAnnotator(object):
             'hover_colour_':   '0.8',
 
             # Margin left.
-            'm_left_':   0.00,
+            'm_left_':   0.05,
             # Margin right.
-            'm_right_':  1.00,
+            'm_right_':  0.95,
             # Margin top.
-            'm_top_':    1.00,
+            'm_top_':    0.95,
             # Margin bottom.
-            'm_bottom_': 0.00,
+            'm_bottom_': 0.05,
 
             # Maximum display size of the viewing area
             'max_area_display_size':    200,
