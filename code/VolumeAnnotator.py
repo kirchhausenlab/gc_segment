@@ -11,7 +11,7 @@ import argparse
 from utils import *
 
 
-IMAGE_RECTANGLE = [0.05, 0.20, 0.60, 0.75]
+IMAGE_RECTANGLE = [-0.10, 0.10, 0.85, 0.85]
 
 KEYPRESS_MOVE_STEP  = 5
 
@@ -179,13 +179,13 @@ class VolumeAnnotator(object):
             'hover_colour_':   '0.8',
 
             # Margin left.
-            'm_left_':   0.05,
+            'm_left_':   0.00,
             # Margin right.
-            'm_right_':   0.95,
+            'm_right_':  1.00,
             # Margin top.
-            'm_top_':   0.95,
+            'm_top_':    1.00,
             # Margin bottom.
-            'm_bottom_':   0.05,
+            'm_bottom_': 0.00,
 
             # Maximum display size of the viewing area
             'max_area_display_size':    200,
@@ -386,8 +386,10 @@ class VolumeAnnotator(object):
         if axis_switch:
 #            self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
             self.ax_image_ = plt.axes(self.ax_image_)
+            self.ax_image_.margins(x=0, y=0, tight=True)
             self.image_handle_ = self.ax_image_.imshow(display_stack_,
-                                                   cmap=self.im_cmap_)
+                                                   cmap=self.im_cmap_,
+                                                   aspect='equal',)
         else:
             self.image_handle_.set_data(display_stack_)
 
@@ -1210,13 +1212,15 @@ class VolumeAnnotator(object):
 
         # Create axes for image.
         self.ax_image_ = plt.axes(IMAGE_RECTANGLE)            # Was 0.05, 0.15, 0.55, 0.8
+        self.ax_image_.margins(x=0, y=0, tight=True)
         # Initialise with the current slice.
         orig_x_min, orig_y_min = self.viewing_rect[Z]
         orig_x_max             = orig_x_min + self.x_view_size
         orig_y_max             = orig_y_min + self.y_view_size
         
         self.image_handle_ = self.ax_image_.imshow(self.disp_stack_[self.z_, orig_y_min:orig_y_max, orig_x_min:orig_x_max, :],
-                                                   cmap=self.im_cmap_)
+                                                   cmap=self.im_cmap_, 
+                                                   aspect='equal')
         self._set_axis_ticks()
         self._set_axis_labels()
         # The above was replaced with the following
@@ -1225,7 +1229,9 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for X-slider
 
-        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.50, 0.025],
+#        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.50, 0.025],
+#                                     facecolor=self.ax_colour_)
+        self.ax_x_slider_ = plt.axes([0.65, 0.5, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add X-slider.
         self.x_slider_ = Slider(self.ax_x_slider_, 'X', 1,
@@ -1240,7 +1246,9 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for Y-slider
 
-        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.50, 0.025],
+#        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.50, 0.025],
+#                                     facecolor=self.ax_colour_)
+        self.ax_y_slider_ = plt.axes([0.65, 0.535, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.y_slider_ = Slider(self.ax_y_slider_, 'Y', 1,
@@ -1255,7 +1263,9 @@ class VolumeAnnotator(object):
         # ================================
         #   Create axes for Z-slider
 
-        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.50, 0.025],
+#        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.50, 0.025],
+#                                     facecolor=self.ax_colour_)
+        self.ax_z_slider_ = plt.axes([0.65, 0.57, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.z_slider_ = Slider(self.ax_z_slider_, 'Z', 1,
