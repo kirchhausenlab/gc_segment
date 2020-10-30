@@ -551,6 +551,10 @@ class VolumeAnnotator(object):
         Uses current state to determine what kind of annotation will be done. 
         """
 
+        # If we are not in annotation display mode, skip. 
+        if self.display_mode_ != ANNOTATION:
+            return
+
         # TODO: The annotation is dependent on the viewing rectangle. 
 
         # Find where the event occurred.
