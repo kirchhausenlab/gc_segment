@@ -19,6 +19,8 @@ FOREGROUND = 'Object'
 BACKGROUND = 'Background'
 ERASE = 'Erase'
 CLICK = 'Click'
+ANNOTATION = 'Annotation'
+SEGMENTATION = 'Segmentation'
 
 
 TICK_STEP = 20
@@ -33,6 +35,12 @@ ANNO_KEYPRESS_DICT = {
     'w':    [BACKGROUND, 1],
     'e':    [ERASE, 2],
     'r':    [CLICK, 3],
+}
+
+
+ANNO_SEG_KEYPRESS_DICT = {
+    'a' :   [ANNOTATION, 0],
+    's' :   [SEGMENTATION, 1],
 }
 
 
@@ -1223,7 +1231,7 @@ class VolumeAnnotator(object):
 
 #        self.ax_x_slider_ = plt.axes([0.05, 0.05, 0.50, 0.025],
 #                                     facecolor=self.ax_colour_)
-        self.ax_x_slider_ = plt.axes([0.65, 0.5, 0.30, 0.025],
+        self.ax_x_slider_ = plt.axes([0.65, 0.3, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add X-slider.
         self.x_slider_ = Slider(self.ax_x_slider_, 'X', 1,
@@ -1240,7 +1248,7 @@ class VolumeAnnotator(object):
 
 #        self.ax_y_slider_ = plt.axes([0.05, 0.085, 0.50, 0.025],
 #                                     facecolor=self.ax_colour_)
-        self.ax_y_slider_ = plt.axes([0.65, 0.535, 0.30, 0.025],
+        self.ax_y_slider_ = plt.axes([0.65, 0.335, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.y_slider_ = Slider(self.ax_y_slider_, 'Y', 1,
@@ -1257,7 +1265,7 @@ class VolumeAnnotator(object):
 
 #        self.ax_z_slider_ = plt.axes([0.05, 0.12, 0.50, 0.025],
 #                                     facecolor=self.ax_colour_)
-        self.ax_z_slider_ = plt.axes([0.65, 0.57, 0.30, 0.025],
+        self.ax_z_slider_ = plt.axes([0.65, 0.37, 0.30, 0.025],
                                      facecolor=self.ax_colour_)
         # Add Z-slider.
         self.z_slider_ = Slider(self.ax_z_slider_, 'Z', 1,
@@ -1384,6 +1392,11 @@ class VolumeAnnotator(object):
 
 
 if __name__ == '__main__':
+    # Remove default matplotlib keyboard bindings
+    for function in plt.rcParams:
+        if function.startswith('keymap.'):
+            plt.rcParams[function] = []
+
     # Ensure that keypresses have corresponding radio buttons.
     for key_ in ANNO_KEYPRESS_DICT:
         assert ANNO_KEYPRESS_DICT[key_][0] in ANNO_CHOICES, '{} not found in ANNO_CHOICES. All keyboard shortcuts \
