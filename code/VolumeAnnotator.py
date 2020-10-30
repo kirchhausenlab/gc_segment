@@ -42,7 +42,7 @@ ANNO_SEG_KEYPRESS_DICT = {
     'a' :   [ANNOTATION, 0],
     's' :   [SEGMENTATION, 1],
 }
-
+ANNO_SEG_CHOICES = [ANNOTATION, SEGMENTATION]
 
 AXIS_CHOICES = [X, Y, Z]
 AXIS_KEYPRESS_DICT = {
@@ -64,10 +64,12 @@ MOVE_KEYPRESS_DICT = {
 RECOGNISED_KEYBOARD_SHORTCUTS = list(ANNO_KEYPRESS_DICT.keys()) + \
     list(PLANES_KEYPRESS_DICT.keys())  + \
     list(AXIS_KEYPRESS_DICT)           + \
-    list(MOVE_KEYPRESS_DICT)            # + <other keyboard shorcuts>
+    list(MOVE_KEYPRESS_DICT)           + \
+    list(ANNO_SEG_KEYPRESS_DICT) # + <other keyboard shorcuts>
 
 FOREGROUND_NAMES = [FOREGROUND, 'Foreground']
 ANNO_DIR = 'annotation/'
+MASK_DIR = 'mask/mask0/'
 OUTPUT_DIR = 'segmentation_cropped/'
 BLK = {
     FOREGROUND: 1,
@@ -151,14 +153,16 @@ class VolumeAnnotator(object):
         assert os.path.exists(
             self.data_path), 'Specified directory {} does not exist!'.format(self.data_path)
 
-        anno_dir = os.path.join(self.output_dir, 'annotation/')
-        data_dir = os.path.join(self.output_dir, 'data/')
+        anno_dir            = os.path.join(self.output_dir, 'annotation/')
+        data_dir            = os.path.join(self.output_dir, 'data/')
+        mask_dir            = os.path.join(self.output_dir, MASK_DIR)
 
-        self.anno_dir = anno_dir
-        self.data_dir = data_dir
+        self.anno_dir       = anno_dir
+        self.data_dir       = data_dir
+        self.mask_dir       = mask_dir
 
         # Make directories if they do not exist.
-        for dir_ in [self.anno_dir, self.data_dir]:
+        for dir_ in [self.anno_dir, self.data_dir, self.mask_dir]:
             if not os.path.exists(dir_):
                 os.makedirs(dir_)
 
@@ -174,7 +178,7 @@ class VolumeAnnotator(object):
 #        os.makedirs(anno_dir)
 
         # Default kwargs.
-        default_kwargs_ = {
+        default_kwargs_     = {
             # Size of the figure
             'figure_size_':   [18, 10],
 
@@ -217,27 +221,27 @@ class VolumeAnnotator(object):
             self.X, self.Y, self.W, self.H = None, None, None, None
 
         # Get image names.
-        self.image_names = sorted(os.listdir(self.data_path))
+        self.image_names    = sorted(os.listdir(self.data_path))
 
         # Z slicing
         if not options.z_limits:
-            self.z_limits = [0, len(self.image_names)]
+            self.z_limits   = [0, len(self.image_names)]
         else:
-            self.z_limits = options.z_limits
+            self.z_limits   = options.z_limits
 
         # Number of slices
-        self.n_slices = self.z_limits[1] - self.z_limits[0]
+        self.n_slices       = self.z_limits[1] - self.z_limits[0]
 
         # Read TIFF stack.
         self.stack = []
         for _z in range(self.z_limits[0], self.z_limits[1]):
-            _f = self.image_names[_z]
-            _img_path = os.path.join(self.data_path, _f)
+            _f              = self.image_names[_z]
+            _img_path       = os.path.join(self.data_path, _f)
             # Read slice.
-            _slice = imageio.imread(_img_path)
+            _slice          = imageio.imread(_img_path)
             # Crop the slice if limits are specified.
             if self.X is not None:
-                _slice = _slice[self.Y: self.Y + self.H,
+                _slice      = _slice[self.Y: self.Y + self.H,
                                 self.X: self.X + self.W]
 
             # Save into data dir
@@ -247,17 +251,17 @@ class VolumeAnnotator(object):
             self.stack.append(_slice)
 
         # Concatenate into one volume.
-        self.stack = np.stack(self.stack)
+        self.stack          = np.stack(self.stack)
         # Image sizes.
-        self.stack_depth = self.stack.shape[0]
-        self.stack_height = self.stack.shape[1]
-        self.stack_width = self.stack.shape[2]
+        self.stack_depth    = self.stack.shape[0]
+        self.stack_height   = self.stack.shape[1]
+        self.stack_width    = self.stack.shape[2]
         # Initialise empty annotation volumes.
         self.fg_annotation_ = np.zeros(self.stack.shape).astype(np.uint8)
         self.bg_annotation_ = np.zeros(self.stack.shape).astype(np.uint8)
         # Copy the stack into another image---this is the image that is displayed.
-        self.disp_stack_ = self.stack.copy()
-        self.disp_stack_ = np.stack(
+        self.disp_stack_    = self.stack.copy()
+        self.disp_stack_    = np.stack(
             (self.disp_stack_, self.disp_stack_, self.disp_stack_)).transpose([1, 2, 3, 0])
 
 
@@ -329,6 +333,14 @@ class VolumeAnnotator(object):
         # Array determining whether there are annotations for a certain plane.
         self.annotated_planes_ = np.zeros(self.n_slices, dtype=bool)
 
+        # Array to read the previous segementation. This is to visualise the annotation and
+        #   segmentation together side-by-side. 
+        self.prev_segmentation_ = np.zeros_like(self.disp_stack_)
+        self.prev_segmentation_[:,:,:,:] = self.disp_stack_[:,:,:,:]
+
+        # Default display mode is ANNOTATION
+        self.display_mode_      = ANNOTATION
+
         # If self.anno_dir already exists, it contains a previously saved annotation.
         # Load it.
         if os.path.exists(self.anno_dir):
@@ -358,6 +370,23 @@ class VolumeAnnotator(object):
         else:
             os.makedirs(self.anno_dir)
 
+        # Load previous segmentation, if it exists. 
+        if os.path.exists(self.mask_dir):
+            # Load previously discovered segmentation. 
+            prev_seg_files      = sorted(os.listdir(self.mask_dir))
+            # Load each image
+            for z, sf in enumerate(prev_seg_files):
+                sf_path         = os.path.join(self.mask_dir, sf)
+                seg             = imageio.imread(sf_path) / 255
+
+                ds_             = (1 - seg) * \
+                                   self.stack[z, :, :]
+                fg_             = seg * 255
+                self.prev_segmentation_[z,:,:,0] = ds_ + fg_
+                self.prev_segmentation_[z,:,:,1] = ds_ + fg_
+
+        
+
     # Update current figure.
 
     def _update_figure(self, axis_switch=False):
@@ -371,7 +400,10 @@ class VolumeAnnotator(object):
             y_max        = y_min + self.y_view_size
             z_max        = z_min + self.z_view_size
 
-            display_stack_ = self.disp_stack_[z_min:z_max, y_min:y_max, self.x_, :]
+            if self.display_mode_ == ANNOTATION:
+                display_stack_ = self.disp_stack_[z_min:z_max, y_min:y_max, self.x_, :]
+            elif self.display_mode_ == SEGMENTATION:
+                display_stack_ = self.prev_segmentation_[z_min:z_max, y_min:y_max, self.x_,:]
 
         elif self.view_axis_ == Y:
             # Determine the viewing rectangle. 
@@ -379,7 +411,10 @@ class VolumeAnnotator(object):
             x_max        = x_min + self.x_view_size
             z_max        = z_min + self.z_view_size
 
-            display_stack_ = self.disp_stack_[z_min:z_max, self.y_, x_min:x_max, :]
+            if self.display_mode_ == ANNOTATION:
+                display_stack_ = self.disp_stack_[z_min:z_max, self.y_, x_min:x_max, :]
+            elif self.display_mode_ == SEGMENTATION:
+                display_stack_ = self.prev_segmentation_[z_min:z_max, self.y_, x_min:x_max, :]
 
         elif self.view_axis_ == Z:
             # Determine the viewing rectangle. 
@@ -387,7 +422,10 @@ class VolumeAnnotator(object):
             x_max        = x_min + self.x_view_size
             y_max        = y_min + self.y_view_size
 
-            display_stack_ = self.disp_stack_[self.z_, y_min:y_max, x_min:x_max, :]
+            if self.display_mode_ == ANNOTATION:
+                display_stack_ = self.disp_stack_[self.z_, y_min:y_max, x_min:x_max, :]
+            elif self.display_mode_ == SEGMENTATION:
+                display_stack_ = self.prev_segmentation_[self.z_, y_min:y_max, x_min:x_max, :]
 
 
 
@@ -691,6 +729,22 @@ class VolumeAnnotator(object):
         self._update_figure()
         return
 
+    def _handle_display_mode_radio(self,
+                                   label):
+        """
+        Handle choice of display mode---annotation or segmentation
+        """
+
+        # First, make sure the figure has been initialised.
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # If label is not the current display_mode_,
+        #   update figure
+        if self.display_mode_ != label:
+            self.display_mode_  = label
+            self._update_figure(axis_switch=False)
+
+        return 
 
     def _handle_ann_mode_radio(self,
                                label):
@@ -831,6 +885,8 @@ class VolumeAnnotator(object):
             return self._handle_axis_keyboard_shortcuts(event.key)
         if event.key in MOVE_KEYPRESS_DICT:
             return self._handle_move_keyboard_shortcuts(event.key)
+        if event.key in ANNO_SEG_KEYPRESS_DICT:
+            return self._handle_anno_seg_keyboard_shortcuts(event.key)
 
         # Can add other functions here.
         return
@@ -922,7 +978,28 @@ class VolumeAnnotator(object):
         # Move in the image according to the displacement. 
         self.move_image(displacement=displacement, location=None)
         return 
-            
+
+
+    def _handle_anno_seg_keyboard_shortcuts(self,
+                                            key):
+        """
+        Handle selecting display mode---annotation or segmentation.
+        """
+
+        # First, make sure the figure is initialised. 
+        assert self.initialised_, 'Figure has not been initialised yet!'
+
+        # Get chosen display mode. 
+        disp_mode, label    = ANNO_SEG_KEYPRESS_DICT[key]
+        # If current display mode is different from key
+        if self.display_mode_ != disp_mode:
+            self.display_mode_ = disp_mode
+            self._update_figure(axis_switch=False)
+
+            self.display_mode_radio_.set_active(label)
+
+           
+        return
 
 
     # Handle x slider.
@@ -1285,6 +1362,17 @@ class VolumeAnnotator(object):
                                          valinit=1, valstep=2)
         # Add the brush size handler function.
         self.brush_size_slider_.on_changed(self._handle_brush_size_slider)
+        # ================================
+
+        # ================================
+        # Add radio button for display mode
+        self.ax_display_mode_radio_     = plt.axes([0.65, 0.5, 0.1, 0.1], 
+                                                facecolor=self.ax_colour_)
+        # Add radio buttons. 
+        self.display_mode_radio_        = RadioButtons(self.ax_display_mode_radio_, 
+                                                ANNO_SEG_CHOICES, active=0)
+        # Add handler for radio buttons 
+        self.display_mode_radio_.on_clicked(self._handle_display_mode_radio)
         # ================================
 
         # ================================
