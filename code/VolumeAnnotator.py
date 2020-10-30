@@ -198,9 +198,6 @@ class VolumeAnnotator(object):
             'm_top_':    0.95,
             # Margin bottom.
             'm_bottom_': 0.05,
-
-            # Maximum display size of the viewing area
-            'max_area_display_size':    200,
         }
         # Set kwargs.
         for k in default_kwargs_:
@@ -270,6 +267,7 @@ class VolumeAnnotator(object):
         #
         # In essence, this restricts the viewing rectangle to a maximum 
         #   size determined by self.max_area_display_size
+        self.max_area_display_size = options.max_area_display_size
         self.x_view_size    = min(self.max_area_display_size, self.W)
         self.y_view_size    = min(self.max_area_display_size, self.H)
         self.z_view_size    = min(self.max_area_display_size, self.n_slices)
