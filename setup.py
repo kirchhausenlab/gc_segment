@@ -7,6 +7,7 @@ setup(
     url='https://github.com/kirchhausenlab/gc_segment',
     author='Benjamin Gallusser, Mihir Sahasrabudhe',
     author_email='benjamin.gallusser@epfl.ch',
+    py_modules=[],
     install_requires=[
         'matplotlib',
         'imageio',
