@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='gc_segment',
@@ -8,6 +8,7 @@ setup(
     author='Benjamin Gallusser, Mihir Sahasrabudhe',
     author_email='benjamin.gallusser@epfl.ch',
     py_modules=[],
+    packages=find_packages(),
     install_requires=[
         'matplotlib',
         'imageio',
