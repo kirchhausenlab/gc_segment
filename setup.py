@@ -17,6 +17,7 @@ setup(
         'scikit-learn',
         'ipython',
         'pyyaml',
+        'cython',
         'funlib.segment @ git+https://github.com/funkelab/funlib.segment@master',
     ],
     scripts=[
