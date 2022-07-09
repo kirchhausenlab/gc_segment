@@ -1,14 +1,14 @@
 # gc_segment
 Annotation-based organelle segmentation using graph cuts
 
-## Installation
+## Getting started
 
-1. Clone this repository
-1. Install the `boost` library: On Linux Debian/Ubuntu systems, you can run `sudo apt install libboost-dev && sudo apt install libboost-all-dev`
-1. Install [anaconda/miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
-1. Create a conda environment using the `environment.yml` file in this repo: `conda env create -f gc_segment/code/environment.yml`
-1. Activate the environment with `conda activate [theEnvNameYouPicked]`
-1. Run `pip install git+https://github.com/funkelab/funlib.segment` to install a required dependency directly from GitHub.
+1. Install some version of anaconda, e.g. [miniconda](https://docs.conda.io/en/latest/miniconda.html).
+1. Open the terminal.
+1. Create a new conda environment: `conda create -n gc_segment python` and activate it: `conda activate gc_segment`.
+1. Install the boost library: `conda install -c conda-forge boost`.
+1. Pip install this repository: `pip install git+https://github.com/kirchhausenlab/gc_segment.git`.
+1. Run "VolumeAnnotator".
 
 ## Available features
 

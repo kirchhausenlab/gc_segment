@@ -21,7 +21,7 @@ from joblib import Parallel, delayed, parallel_backend
 from matplotlib import animation, rc
 from IPython.display import HTML
 import argparse
-from attr_dict import *
+from .attr_dict import *
 
 import logging
 

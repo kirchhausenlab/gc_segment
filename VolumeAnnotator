@@ -8,7 +8,7 @@ from matplotlib.widgets import Slider, Button, RadioButtons, TextBox
 from matplotlib.backend_bases import MouseButton
 import time
 import argparse
-from utils import *
+from gc_segment.utils import *
 
 
 IMAGE_RECTANGLE = [0.03, 0.10, 0.60, 0.70]
