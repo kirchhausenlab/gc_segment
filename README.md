@@ -8,8 +8,10 @@ Annotation-based organelle segmentation using graph cuts
 1. Create a new conda environment: `conda create -n gc_segment python` and activate it: `conda activate gc_segment`.
 1. Install the boost library: `conda install -c conda-forge boost`.
 1. Pip install Cython: `pip install cython`.
-1. Pip install this repository: `pip install git+https://github.com/kirchhausenlab/gc_segment.git`.
-1. Run "VolumeAnnotator".
+1. Clone this git repository `git clone https://github.com/kirchhausenlab/gc_segment.git` and pip install it `pip install -e ./gc_segment`.
+1. Move into the repository: `cd gc_segment`.
+1. Adapt `configs/template.yaml` to your dataset.
+1. Run `python VolumeAnnotator.py --cfg configs/template.yaml` to create annotation seeds and `python segment.py --cfg configs/template.yaml` to generate a segmentation based on the annotation seeds. 
 
 ## Available features
 

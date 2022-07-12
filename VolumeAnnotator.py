@@ -151,7 +151,7 @@ class VolumeAnnotator(object):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        self.data_path = options.data_path
+        self.data_path = os.path.expanduser(options.data_path)
         assert os.path.exists(
             self.data_path), 'Specified directory {} does not exist!'.format(self.data_path)
 

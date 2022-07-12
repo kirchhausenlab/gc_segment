@@ -14,14 +14,14 @@ setup(
         'imageio',
         'scikit-image',
         'opencv-python',
-        'maxflow',
+        'pymaxflow',
         'scikit-learn',
         'ipython',
         'pyyaml',
         'cython',
+        'simpleitk',
+        'daisy',
+        'zarr',
         'funlib.segment @ git+https://github.com/funkelab/funlib.segment@master',
-    ],
-    scripts=[
-        "VolumeAnnotator"
     ],
 )

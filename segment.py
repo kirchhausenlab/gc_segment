@@ -1,4 +1,4 @@
-from utils import *
+from gc_segment.utils import *
 from VolumeAnnotator import *
 import pickle
 import time
@@ -17,8 +17,8 @@ import SimpleITK as sitk
 
 from funlib.segment.arrays import replace_values
 
-import visualization_utils
-from utils import get_supervoxel_size
+from gc_segment import visualization_utils
+from gc_segment.utils import get_supervoxel_size
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ class SegmentationModule(object):
 
         # ====================================================================
         #   Make sure data path exists.
-        self.data_path = self.options.data_path
+        self.data_path = os.path.expanduser(self.options.data_path)
         assert os.path.exists(
             self.data_path), 'Specified data_path {} does not exist!'.format(
             self.data_path)

@@ -1,7 +1,8 @@
-data_path:  /home/tkadmin/mihir/data/20190613_full/
+data_path:  ~/data/tklab/20190613
 coords: [1968, 1168, 356, 344]
 n_superpixels: 6000
 n_jobs: 48
 use_gmm: True
 delta: 1
 lamda: 4
+max_area_display_size: 1000
