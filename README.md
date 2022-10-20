@@ -10,9 +10,9 @@ Annotation-based organelle segmentation using graph cuts
 1. Pip install Cython: `pip install cython`.
 1. Clone this git repository `git clone https://github.com/kirchhausenlab/gc_segment.git` and pip install it `pip install -e ./gc_segment`.
 
-## General Usage
+## <a name="generalusage"></a> General Usage
 1. Move into the repository: `cd gc_segment`.
-1. Adapt `configs/template.yaml` to your dataset (see below for instructions)
+1. Adapt `configs/template.yaml` to your dataset (see [Config files](#configs) below for instructions)
 1. Run 
    - `python VolumeAnnotator.py --cfg <path-to-config>` to create annotation seeds; and 
    - `python segment.py --cfg <path-to-config>` to generate a segmentation based on the annotation seeds.
@@ -27,9 +27,9 @@ Annotation-based organelle segmentation using graph cuts
 1. **Saving and resuming**: The user can pause and save the annotations at any moment. It is also possible to resume annotating from a previously saved state. 
 1. **Superimposing previous result**: In case the annotator wishes to go through an iterative process of refinement of annotations, it is possible to overlay the result of a previous segmentation to visualize problematic regions which might need more attention. 
 
-## Annotator layout
+## Annotator GUI
 
-The annotator has the following layout---
+The annotator graphical user interface (GUI) has the following layout.
 ![Example screen](/gc_segment/objects.png)
 
 The user is shown a part of one plane of the volume in the viewing pane. The part shown can be determined using three things---
@@ -47,10 +47,10 @@ Furthermore,
   - `Background` marks a pixel as background;
   - `Erase` erases the mark at a pixel; and
   - `Click` has no effect at all.
-* "Annotation/Segmentation mode" is something that can be used to refine previously made segmentations. In particular, if the tool finds a previously stored segmentation, it can be overlaid onto the current volume instead of the markings to examine the segmentation visually (see example figure below). *NOTE*: The "Segmentation" mode does **not** generate the segmentation, but simply overlays it on the volume. To generate the segmentation from the seeds themselves, please run `segment.py` as indicated above in [General Usage](https://github.com/kirchhausenlab/gc_segment/edit/master/README.md#general-usage).
+* "Annotation/Segmentation mode" is something that can be used to refine previously made segmentations. In particular, if the tool finds a previously stored segmentation, it can be overlaid onto the current volume instead of the markings to examine the segmentation visually (see example figure below). *NOTE*: The "Segmentation" mode does **not** generate the segmentation, but simply overlays it on the volume. To generate the segmentation from the seeds themselves, please run `segment.py` as indicated above in [General Usage](#generalusage).
 
 
-## Config files
+## <a name="configs"></a> Config files
 Configuration files in `configs/` let the user determine the parameters of the annotation task. Below is an example configuration file with the meanings of the parameters---
 ![Example config file](/gc_segment/config.png)
 Some points to note:
@@ -65,7 +65,7 @@ Some points to note:
 
 ## Example 
 
-The figure below shows an example of a raw volume, of seeds, and of the resulting segmentation overlaid on the volume with the "Segmentation" mode.
+The figure below shows an example of a raw volume, of seeds, and of the resulting segmentation overlaid on the volume with the "Segmentation" mode. Pixels marked objects appear in blue, while those marked background appear in red.
 ![Example steps](/gc_segment/modes.png)
 
 ## Best practices
