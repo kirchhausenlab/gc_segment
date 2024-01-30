@@ -5,7 +5,7 @@ import sys
 import os
 import skimage
 from skimage import color as skcolor
-from skimage.future import graph as skgraph
+from skimage import graph as skgraph
 from skimage import data as skdata
 from skimage import segmentation as sksegmentation
 import imageio
